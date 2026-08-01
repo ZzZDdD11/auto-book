@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import jobs, materials
+from backend.api import books, jobs, materials
 from backend.db import init_db
 
 
@@ -18,11 +18,12 @@ app = FastAPI(title="auto-book", lifespan=lifespan)
 # v1 只在本机跑，只放开本地前端
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5273", "http://127.0.0.1:5273"],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
 
+app.include_router(books.router)
 app.include_router(materials.router)
 app.include_router(jobs.router)
 

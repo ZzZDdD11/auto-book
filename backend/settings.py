@@ -38,6 +38,20 @@ class Settings(BaseSettings):
 
     render_timeout_s: int = 600
 
+    # ---- EPUB 上传 ----
+    # EPUB 是用户上传的不可信 ZIP，下面几个上限用来防 zip bomb。
+    max_epub_bytes: int = 80 * 1024 * 1024
+    max_epub_entries: int = 5000
+    max_epub_uncompressed_bytes: int = 400 * 1024 * 1024
+
+    @property
+    def epub_dir(self) -> Path:
+        return self.storage_dir / "epubs"
+
+    @property
+    def cover_dir(self) -> Path:
+        return self.storage_dir / "covers"
+
 
 @lru_cache
 def get_settings() -> Settings:

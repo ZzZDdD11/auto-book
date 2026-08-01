@@ -7,8 +7,8 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# 只监听本机，不暴露公网
-.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload &
+# 只监听本机，不暴露公网。8077 是为了避开常被占用的 8000。
+.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8077 --reload &
 BACKEND=$!
 trap 'kill $BACKEND 2>/dev/null || true' EXIT
 

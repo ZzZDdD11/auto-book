@@ -46,6 +46,16 @@ class Book(SQLModel, table=True):
     title: str
     author: str = ""
     cover_path: str | None = None
+    # ---- EPUB 阅读器用 ----
+    epub_path: str | None = None
+    # 同一本书重复上传时复用记录，不新建
+    file_sha256: str | None = Field(default=None, index=True)
+    # 全书有效字符数，是阅读进度的分母
+    total_chars: int = 0
+    # 章节表（标题 + 字数 + 累计偏移）的 JSON，用来把章内比例换算成全书进度
+    chapters_json: str | None = None
+    # 上次读到哪（EPUB CFI），重开自动跳回
+    last_cfi: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -58,6 +68,8 @@ class Material(SQLModel, table=True):
     chapter: str | None = None
     highlighted_at: date | None = None
     progress: int | None = None
+    # EPUB 定位符，用来回到划线处
+    cfi: str | None = None
     source: MaterialSource = MaterialSource.paste
     mode: MaterialMode = MaterialMode.fast
     created_at: datetime = Field(default_factory=utcnow)
