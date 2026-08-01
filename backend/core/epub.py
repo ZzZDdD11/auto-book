@@ -8,6 +8,7 @@
 """
 
 import hashlib
+import re
 import zipfile
 from dataclasses import dataclass, field
 from io import BytesIO
@@ -248,11 +249,70 @@ def _extract_cover(
     return None, ".jpg"
 
 
-def parse_epub(data: bytes) -> EpubMeta:
-    """解析 EPUB，返回元数据、章节字数表、封面。
+_HEADING = re.compile(rb"<h[1-4][^>]*>(.*?)</h[1-4]>", re.IGNORECASE | re.DOTALL)
+_TAG = re.compile(rb"<[^>]+>")
 
-    调用前应先用 validate_and_hash 校验。
+# 章节标题上限。QuoteFrame.chapter 限 30 字，这里对齐。
+_TITLE_MAX = 30
+
+# 很多发行方在每章开头塞样板文字，取首句会取到它们，得跳过。
+# 注意用单词而非短语：句读切分会把 "Project Gutenberg eBook of" 切碎。
+_BOILERPLATE = (
+    "gutenberg",
+    "ebook",
+    "e-book",
+    "本电子书",
+    "免费下载",
+    "cover",
+    "封面",
+    "目录",
+    "table of contents",
+    "版权",
+    "copyright",
+    "all rights reserved",
+    "license",
+    "许可",
+    "creating the works",
+    "www.",
+    "http",
+)
+
+
+def _looks_like_boilerplate(text: str) -> bool:
+    low = text.lower().strip(" \"'“”·-—")
+    return any(b in low for b in _BOILERPLATE)
+
+
+def _chapter_title(toc_title: str | None, raw: bytes, text: str, index: int) -> str:
+    """定章节标题，逐级兜底。
+
+    实测很多真实 EPUB（例如古登堡计划的中文书）根本没有目录：
+    nav 文档里只有版权声明，正文也没有 h1-h4，而且每章开头还有
+    发行方的样板文字。「第 N 节」这种标题对视频毫无意义，
+    所以尽量从正文里找一句能认出这段内容的话。
     """
+    if toc_title and toc_title.strip() and not _looks_like_boilerplate(toc_title):
+        return toc_title.strip()[:_TITLE_MAX]
+
+    # 正文里的 h1-h4
+    for m in _HEADING.finditer(raw):
+        candidate = " ".join(
+            _TAG.sub(b" ", m.group(1)).decode("utf-8", errors="ignore").split()
+        )
+        if candidate and not _looks_like_boilerplate(candidate):
+            return candidate[:_TITLE_MAX]
+
+    # 正文里第一句像正文的话（跳过样板）
+    flat = " ".join(text.split())
+    for piece in re.split(r"[。！？.!?；;\n]", flat):
+        piece = piece.strip(" \"'“”·-—")
+        if len(piece) >= 6 and not _looks_like_boilerplate(piece):
+            return piece[:_TITLE_MAX]
+
+    return f"第 {index + 1} 节"
+
+
+def parse_epub(data: bytes) -> EpubMeta:
     try:
         with zipfile.ZipFile(BytesIO(data)) as zf:
             opf_path = _find_opf_path(zf)
@@ -283,13 +343,14 @@ def parse_epub(data: bytes) -> EpubMeta:
                 path = _resolve(opf_path, href)
                 if path not in names:
                     continue
-                count = _count_chars(_strip_tags(zf.read(path)))
+                raw = zf.read(path)
+                text = _strip_tags(raw)
+                count = _count_chars(text)
                 chapters.append(
                     Chapter(
                         index=i,
                         href=href,
-                        # QuoteFrame.chapter 限 30 字，这里就先截断
-                        title=(toc_titles.get(path) or f"第 {i + 1} 节")[:30],
+                        title=_chapter_title(toc_titles.get(path), raw, text, i),
                         char_count=count,
                         char_offset=offset,
                     )
