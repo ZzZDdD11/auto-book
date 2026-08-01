@@ -54,7 +54,7 @@
 
 ```
 auto-book/
-├── backend/              Python 3.11 · FastAPI
+├── backend/              Python 3.12 · FastAPI
 │   ├── api/              HTTP 接口
 │   ├── core/
 │   │   ├── script.py     DeepSeek → 五帧脚本 JSON
