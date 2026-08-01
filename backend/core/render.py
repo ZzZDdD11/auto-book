@@ -73,6 +73,8 @@ def build_render_command(
 ) -> list[str]:
     if not props_path.is_file():
         raise RenderError(f"props 文件不存在：{props_path}")
+    # Remotion 的工作目录是 video/，相对路径会被它按 video/ 解析而找不到文件。
+    # 所以这里一律转成绝对路径。
     return [
         npx,
         "--no-install",
@@ -80,8 +82,8 @@ def build_render_command(
         "render",
         ENTRY_POINT,
         COMPOSITION_ID,
-        str(out_path),
-        f"--props={props_path}",
+        str(out_path.resolve()),
+        f"--props={props_path.resolve()}",
         f"--concurrency={concurrency}",
         "--log=error",
     ]

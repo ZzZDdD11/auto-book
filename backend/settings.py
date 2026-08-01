@@ -16,7 +16,8 @@ class Settings(BaseSettings):
 
     deepseek_api_key: SecretStr
     deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
+    # 可用模型见 GET /models。deepseek-v4-flash 快且便宜，pro 更强更贵。
+    deepseek_model: str = "deepseek-v4-flash"
 
     tts_voice: str = "zh-CN-YunxiNeural"
 

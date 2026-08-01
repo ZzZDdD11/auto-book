@@ -22,7 +22,7 @@ export const defaultProps: RenderPayload = {
           "你不是",
           "不够自律"
         ],
-        "highlight": "只是环境太顺手",
+        "highlight": "不够自律",
         "book_title": "原子习惯",
         "book_author": "James Clear",
         "book_index": 7,

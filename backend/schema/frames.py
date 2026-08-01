@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 FrameKind = Literal["hook", "quote", "breakdown", "my_take", "outro"]
 
@@ -38,6 +38,18 @@ class HookFrame(BaseFrame):
 
     lines: list[Text] = Field(min_length=1, max_length=2)
     highlight: Text | None = Field(default=None, max_length=20)
+
+    @model_validator(mode="after")
+    def check_highlight(self):
+        """highlight 必须是 lines 里的某一行。
+
+        prompt 已经交代过，但模型仍会自作主张写一句新的、或者写太长。
+        那会在竖屏上折行破版，所以这里直接丢掉不合规的值 ——
+        少一个强调色好过版式崩掉。
+        """
+        if self.highlight is not None and self.highlight not in self.lines:
+            object.__setattr__(self, "highlight", None)
+        return self
 
 
 class QuoteFrame(BaseFrame):

@@ -15,6 +15,7 @@ export const Hook: React.FC<{ theme: Theme; data: HookData }> = ({ theme, data }
   const frame = useCurrentFrame();
   const rise = interpolate(frame, [0, 18], [40, 0], { extrapolateRight: "clamp" });
   const fade = interpolate(frame, [0, 14], [0, 1], { extrapolateRight: "clamp" });
+  const accent = theme.accent ?? "#e8b84b";
 
   return (
     <Shell
@@ -33,12 +34,12 @@ export const Hook: React.FC<{ theme: Theme; data: HookData }> = ({ theme, data }
           opacity: fade,
         }}
       >
+        {/* highlight 是 lines 里的某一行，用来给那行上色 —— 不是额外加一行 */}
         {data.lines.map((line, i) => (
-          <div key={i}>{line}</div>
+          <div key={i} style={line === data.highlight ? { color: accent } : undefined}>
+            {line}
+          </div>
         ))}
-        {data.highlight ? (
-          <div style={{ color: theme.accent ?? "#e8b84b", marginTop: 10 }}>{data.highlight}</div>
-        ) : null}
       </div>
     </Shell>
   );
