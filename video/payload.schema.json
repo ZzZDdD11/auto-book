@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "Caption": {
+      "description": "一行字幕。时间相对所属帧的起点。",
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "startS": {
+          "minimum": 0.0,
+          "title": "Starts",
+          "type": "number"
+        },
+        "endS": {
+          "minimum": 0.0,
+          "title": "Ends",
+          "type": "number"
+        }
+      },
+      "required": [
+        "text",
+        "startS",
+        "endS"
+      ],
+      "title": "Caption",
+      "type": "object"
+    },
+    "FramePayload": {
+      "description": "一帧的全部渲染信息。\n\ndata 是对应帧模型 dump 出来的字典，结构由 kind 决定。\n这里刻意用 dict 而不是联合类型：Python 侧已经用 Script 校验过了，\n这一层只负责搬运，不重复校验。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "hook",
+            "quote",
+            "breakdown",
+            "my_take",
+            "outro"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "durationInFrames": {
+          "exclusiveMinimum": 0,
+          "title": "Durationinframes",
+          "type": "integer"
+        },
+        "data": {
+          "title": "Data",
+          "type": "object"
+        },
+        "audioSrc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audiosrc"
+        },
+        "captions": {
+          "items": {
+            "$ref": "#/$defs/Caption"
+          },
+          "title": "Captions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "durationInFrames",
+        "data"
+      ],
+      "title": "FramePayload",
+      "type": "object"
+    },
+    "Theme": {
+      "description": "配色。改视觉调性只改这里，五个帧组件都读它。",
+      "properties": {
+        "ink": {
+          "default": "#12100e",
+          "title": "Ink",
+          "type": "string"
+        },
+        "paper": {
+          "default": "#f4f1ec",
+          "title": "Paper",
+          "type": "string"
+        },
+        "accent": {
+          "default": "#e8b84b",
+          "title": "Accent",
+          "type": "string"
+        },
+        "takeBg": {
+          "default": "#0f2a24",
+          "title": "Takebg",
+          "type": "string"
+        },
+        "takeAccent": {
+          "default": "#4fd1a5",
+          "title": "Takeaccent",
+          "type": "string"
+        }
+      },
+      "title": "Theme",
+      "type": "object"
+    }
+  },
+  "description": "Remotion Composition 的完整输入。",
+  "properties": {
+    "fps": {
+      "exclusiveMinimum": 0,
+      "title": "Fps",
+      "type": "integer"
+    },
+    "width": {
+      "default": 1080,
+      "title": "Width",
+      "type": "integer"
+    },
+    "height": {
+      "default": 1920,
+      "title": "Height",
+      "type": "integer"
+    },
+    "theme": {
+      "$ref": "#/$defs/Theme"
+    },
+    "frames": {
+      "items": {
+        "$ref": "#/$defs/FramePayload"
+      },
+      "minItems": 1,
+      "title": "Frames",
+      "type": "array"
+    },
+    "bgmSrc": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bgmsrc"
+    },
+    "bgmVolume": {
+      "default": 0.12,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Bgmvolume",
+      "type": "number"
+    }
+  },
+  "required": [
+    "fps",
+    "frames"
+  ],
+  "title": "RenderPayload",
+  "type": "object"
+}

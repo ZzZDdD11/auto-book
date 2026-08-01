@@ -13,6 +13,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT_FILE = PROJECT_ROOT / "video" / "src" / "types.ts"
 
+# 允许直接 python scripts/gen_types.py 运行，不必先设 PYTHONPATH
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 
 def main() -> int:
     from backend.schema.payload import RenderPayload
