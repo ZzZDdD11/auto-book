@@ -1,0 +1,22 @@
+# 依赖
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 密钥与配置
+.env
+.env.*
+!.env.example
+
+# 数据与产物
+storage/
+*.db
+*.sqlite3
+video/out/
+
+# 工具与临时
+.superpowers/
+.DS_Store
+*.log
