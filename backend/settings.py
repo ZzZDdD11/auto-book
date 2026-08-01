@@ -1,0 +1,43 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+class Settings(BaseSettings):
+    """全部配置。密钥只从环境变量读，代码里没有任何默认值。"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    deepseek_api_key: SecretStr
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+
+    tts_voice: str = "zh-CN-YunxiNeural"
+
+    fps: int = 30
+    # 每帧配音结束后的留白，避免切帧太急
+    frame_padding_s: float = 0.45
+    # 无配音帧（钩子）的固定时长
+    silent_frame_s: float = 3.0
+
+    storage_dir: Path = PROJECT_ROOT / "storage"
+    video_dir: Path = PROJECT_ROOT / "video"
+
+    # v1 单用户，固定 1；表结构已预留多用户
+    default_user_id: int = 1
+
+    # 素材文本长度上限，防止超长输入打爆 AI 调用与渲染
+    max_material_chars: int = 4000
+
+    render_timeout_s: int = 600
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
