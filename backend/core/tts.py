@@ -12,6 +12,7 @@ edge-tts 的文档描述了 WordBoundary 事件，但实测当前服务端对中
 如果哪天服务端恢复了 WordBoundary，可以在这里追加处理并让 caption 用更细的粒度。
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,6 +23,11 @@ TICKS_PER_SECOND = 10_000_000
 
 # 服务端可能返回的边界事件类型，都按「一段带时间的文本」处理
 _BOUNDARY_TYPES = frozenset({"SentenceBoundary", "WordBoundary"})
+
+# edge-tts 走公网 websocket，偶发 DNS/连接失败很常见（实测遇到过）。
+# 不重试的话，网络抖一下整个任务就废了，前面生成脚本花的钱也白费。
+DEFAULT_ATTEMPTS = 3
+RETRY_BACKOFF_S = 2.0
 
 
 @dataclass(frozen=True)
@@ -40,12 +46,7 @@ class TtsResult:
     segments: list[Segment] = field(default_factory=list)
 
 
-async def synthesize(text: str, voice: str, out_path: Path) -> TtsResult:
-    """合成一段配音。text 为空时返回空结果，不发请求。"""
-    if not text.strip():
-        return TtsResult(audio_path=None, duration_s=0.0, segments=[])
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+async def _synthesize_once(text: str, voice: str) -> tuple[bytes, list[Segment]]:
     segments: list[Segment] = []
     chunks: list[bytes] = []
 
@@ -65,8 +66,36 @@ async def synthesize(text: str, voice: str, out_path: Path) -> TtsResult:
             )
 
     if not chunks:
-        raise RuntimeError(f"TTS 没有返回音频：voice={voice}")
+        raise RuntimeError("TTS 没有返回音频")
+    return b"".join(chunks), segments
 
-    out_path.write_bytes(b"".join(chunks))
-    duration = segments[-1].end_s if segments else 0.0
-    return TtsResult(audio_path=out_path, duration_s=duration, segments=segments)
+
+async def synthesize(
+    text: str, voice: str, out_path: Path, attempts: int = DEFAULT_ATTEMPTS
+) -> TtsResult:
+    """合成一段配音。text 为空时返回空结果，不发请求。
+
+    失败会重试（指数退避），全部失败才抛错。
+    """
+    if not text.strip():
+        return TtsResult(audio_path=None, duration_s=0.0, segments=[])
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            audio, segments = await _synthesize_once(text, voice)
+        except Exception as exc:  # noqa: BLE001  网络异常类型很杂，统一重试
+            last_error = exc
+            if attempt < attempts - 1:
+                await asyncio.sleep(RETRY_BACKOFF_S * (2**attempt))
+            continue
+
+        out_path.write_bytes(audio)
+        duration = segments[-1].end_s if segments else 0.0
+        return TtsResult(audio_path=out_path, duration_s=duration, segments=segments)
+
+    raise RuntimeError(
+        f"TTS 连续 {attempts} 次失败（voice={voice}）：{type(last_error).__name__}: {last_error}"
+    ) from last_error
