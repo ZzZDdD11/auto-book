@@ -10,3 +10,8 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+# prompt 是给模型看的自然语言，硬折行会破坏可读性，不限行宽
+"backend/core/script.py" = ["E501"]
+"backend/core/copywrite.py" = ["E501"]
