@@ -268,3 +268,22 @@ export type MaterialWithJob = {
 /** 列出所有素材，带关联书名和最新 job 状态。 */
 export const listAllMaterials = () =>
   get<MaterialWithJob[]>("/api/materials");
+
+/** 素材完整内容 + 关联书名 + 最新 job_id。 */
+export type MaterialFull = {
+  id: number;
+  source_text: string;
+  my_take: string;
+  chapter: string | null;
+  progress: number | null;
+  highlighted_at: string | null;
+  created_at: string;
+  mode: string;
+  book_id: number | null;
+  book_title: string | null;
+  book_author: string | null;
+  job_id: number | null;
+};
+
+export const getMaterialFull = (id: number) =>
+  get<MaterialFull>(`/api/materials/${id}/full`);

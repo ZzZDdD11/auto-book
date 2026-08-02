@@ -97,25 +97,28 @@ export function MaterialsPage() {
               ) : null}
 
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                <Link
+                  to={`/material/${m.id}`}
+                  style={{
+                    fontSize: 12,
+                    color: "#fff",
+                    textDecoration: "none",
+                    background: "#0f2a24",
+                    padding: "4px 14px",
+                    borderRadius: 5,
+                  }}
+                >
+                  查看 / 编辑
+                </Link>
                 {m.job_id ? (
                   <>
-                    <Link
-                      to={`/read/${m.book_id}`}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 13,
-                        color,
-                        textDecoration: "none",
-                      }}
-                    >
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color }}>
                       <span style={{ fontSize: 14 }}>{icon}</span>
                       任务 #{m.job_id}
                       <span style={{ color: "#999" }}>
                         {m.job_status === "done" ? "完成" : m.job_status?.endsWith("_pending") ? "待审" : "进行中"}
                       </span>
-                    </Link>
+                    </span>
                     <a
                       href={`/api/jobs/${m.job_id}/video`}
                       download
@@ -127,20 +130,6 @@ export function MaterialsPage() {
                 ) : (
                   <span style={{ fontSize: 12, color: "#ccc" }}>未出过视频</span>
                 )}
-                <Link
-                  to={`/read/${m.book_id}`}
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: 12,
-                    color: "#666",
-                    textDecoration: "none",
-                    border: "1px solid #ddd",
-                    padding: "3px 10px",
-                    borderRadius: 4,
-                  }}
-                >
-                  查看 / 编辑
-                </Link>
               </div>
             </div>
           );

@@ -162,6 +162,38 @@ async def edit_material(
     return {"material_id": material_id, "restarted_jobs": restarted}
 
 
+@router.get("/{material_id}/full")
+def get_material_full(material_id: int, session: SessionDep) -> dict:
+    """返回素材完整内容 + 关联书名 + 最新 job_id。
+
+    素材工作台用：不截断地展示原文和想法，同时告诉前端该去哪个 job 拉五环节面板。
+    """
+    material = session.get(Material, material_id)
+    if material is None:
+        raise HTTPException(status_code=404, detail="素材不存在")
+
+    book = session.get(Book, material.book_id) if material.book_id else None
+    jobs = session.exec(
+        select(Job).where(Job.material_id == material_id).order_by(Job.created_at.desc())
+    ).all()
+    latest_job = jobs[0] if jobs else None
+
+    return {
+        "id": material.id,
+        "source_text": material.source_text,
+        "my_take": material.my_take,
+        "chapter": material.chapter,
+        "progress": material.progress,
+        "highlighted_at": material.highlighted_at.isoformat() if material.highlighted_at else None,
+        "created_at": material.created_at.isoformat(),
+        "mode": material.mode.value,
+        "book_id": material.book_id,
+        "book_title": book.title if book else None,
+        "book_author": book.author if book else None,
+        "job_id": latest_job.id if latest_job else None,
+    }
+
+
 @router.get("", response_model=list[dict])
 def list_all_materials(session: SessionDep) -> list[dict]:
     """列出所有素材，带关联书名和最新 job 状态。
