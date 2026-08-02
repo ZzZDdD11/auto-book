@@ -18,6 +18,7 @@ video/out/
 
 # 工具与临时
 .superpowers/
+.worktrees/
 .DS_Store
 *.log
 
