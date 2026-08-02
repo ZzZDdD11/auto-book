@@ -168,15 +168,15 @@ export function JobPanel({
     }
   };
 
-  // 默认展开：当前进行中/待审的环节
-  const initialOpen = (() => {
+  // 默认展开：待审环节优先，done 全展开，否则展开当前进行中的
+  const initialOpenStage = (() => {
     const s = job.status;
     if (s === "script_pending" || s === "scripting") return "script";
     if (s === "render_pending" || s === "rendering") return "video";
     if (s === "copy_pending" || s === "copywriting") return "copy";
-    if (s === "done") return "copy";
     return "script";
   })();
+  const doneAllOpen = job.status === "done";
 
   return (
     <section
@@ -209,11 +209,11 @@ export function JobPanel({
       ) : null}
 
       {/* 五个环节，每个可折叠 */}
-      <StepBlock label="素材" stage="material" jobStatus={job.status} initialOpen={false} ui={c}>
+      <StepBlock label="素材" stage="material" jobStatus={job.status} initialOpen={doneAllOpen} ui={c}>
         <MaterialStep jobId={job.id} ui={c} setJob={setJob} />
       </StepBlock>
 
-      <StepBlock label="脚本" stage="script" jobStatus={job.status} initialOpen={initialOpen === "script"} ui={c}>
+      <StepBlock label="脚本" stage="script" jobStatus={job.status} initialOpen={doneAllOpen || initialOpenStage === "script"} ui={c}>
         {job.script ? (
           <ScriptStep
             script={job.script}
@@ -230,13 +230,13 @@ export function JobPanel({
         )}
       </StepBlock>
 
-      <StepBlock label="配音" stage="audio" jobStatus={job.status} initialOpen={false} ui={c}>
+      <StepBlock label="配音" stage="audio" jobStatus={job.status} initialOpen={doneAllOpen} ui={c}>
         <AudioStep jobId={job.id} ui={c} />
       </StepBlock>
 
-      <StepBlock label="视频" stage="video" jobStatus={job.status} initialOpen={initialOpen === "video"} ui={c}>
+      <StepBlock label="视频" stage="video" jobStatus={job.status} initialOpen={doneAllOpen || initialOpenStage === "video"} ui={c}>
         <VideoStep job={job} ui={c} />
-        {job.script && (job.status === "render_pending") ? (
+        {job.script && job.status === "render_pending" ? (
           <ScriptStep
             script={job.script}
             ui={c}
@@ -250,7 +250,7 @@ export function JobPanel({
         ) : null}
       </StepBlock>
 
-      <StepBlock label="文案" stage="copy" jobStatus={job.status} initialOpen={initialOpen === "copy"} ui={c}>
+      <StepBlock label="文案" stage="copy" jobStatus={job.status} initialOpen={doneAllOpen || initialOpenStage === "copy"} ui={c}>
         {job.copies ? (
           <CopyStep jobId={job.id} copies={job.copies} ui={c} busy={busy} setJob={setJob} />
         ) : (
