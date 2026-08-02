@@ -177,6 +177,112 @@ function ReaderToolbar({
   );
 }
 
+/** 一条排队中的划线：选区信息 + 异步算好的全书进度。 */
+type PendingSelection = {
+  info: SelectionInfo;
+  progress: number | null;
+};
+
+/**
+ * 划线排队条：每次划线只在这里追加一条卡片，不弹窗、不挡住阅读区，
+ * 可以连续划第二、第三条。想写想法时再点「写想法」才打开大弹框。
+ */
+function PendingQueue({
+  items,
+  ui,
+  onOpen,
+  onDiscard,
+}: {
+  items: PendingSelection[];
+  ui: UiPalette;
+  onOpen: (cfi: string) => void;
+  onDiscard: (cfi: string) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 60,
+        right: 16,
+        zIndex: 25,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        maxWidth: 280,
+        alignItems: "flex-end",
+      }}
+    >
+      {items.map((p) => (
+        <div
+          key={p.info.cfi}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "7px 10px",
+            borderRadius: 10,
+            background: ui.toolbarBg,
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            border: `1px solid ${ui.border}`,
+            boxShadow: "0 2px 10px rgba(0,0,0,.14)",
+            fontSize: 12,
+            color: ui.text,
+            maxWidth: "100%",
+          }}
+        >
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={p.info.text}
+          >
+            {p.info.text}
+          </span>
+          <button
+            onClick={() => onOpen(p.info.cfi)}
+            style={{
+              border: "none",
+              background: ui.accent,
+              color: ui.accentText,
+              borderRadius: 6,
+              padding: "3px 8px",
+              fontSize: 11,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+            }}
+          >
+            写想法
+          </button>
+          <button
+            onClick={() => onDiscard(p.info.cfi)}
+            title="丢弃这条划线"
+            style={{
+              border: "none",
+              background: "transparent",
+              color: ui.faint,
+              cursor: "pointer",
+              fontSize: 14,
+              padding: "0 2px",
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** 划线后的弹框。整个产品里唯一需要手动输入的地方。 */
 function TakeDialog({
   selection,
@@ -638,8 +744,11 @@ export function Reader() {
 
   const [book, setBook] = useState<BookOut | null>(null);
   const [materials, setMaterials] = useState<MaterialBrief[]>([]);
-  const [selection, setSelection] = useState<SelectionInfo | null>(null);
-  const [progress, setProgress] = useState<number | null>(null);
+  // 划线先进队列，不立刻弹窗，允许连续划第二、第三条；
+  // 点队列里某一条的「写想法」才打开 TakeDialog（用 cfi 定位当前是哪条）。
+  const [pending, setPending] = useState<PendingSelection[]>([]);
+  const [activeCfi, setActiveCfi] = useState<string | null>(null);
+  const active = pending.find((p) => p.info.cfi === activeCfi) ?? null;
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editMaterial, setEditMaterial] = useState<MaterialBrief | null>(null);
@@ -658,32 +767,37 @@ export function Reader() {
     })();
   }, [id]);
 
-  // 选中后立刻问后端要真实进度 —— 前端算不了，它需要全书字数表
+  // 划线只入队，不弹窗 —— 允许接着划第二、第三条。
+  // 进度仍立刻问后端要（前端算不了，它需要全书字数表），算好了原地更新那一条。
   const onSelect = (info: SelectionInfo) => {
-    setSelection(info);
-    setProgress(null);
+    setPending((prev) => [...prev, { info, progress: null }]);
+    const applyProgress = (progress: number) =>
+      setPending((prev) =>
+        prev.map((p) => (p.info.cfi === info.cfi ? { ...p, progress } : p)),
+      );
     void calcProgress(id, info.chapterIndex, info.fraction)
-      .then((r) => setProgress(r.progress))
-      .catch(() => setProgress(0));
+      .then((r) => applyProgress(r.progress))
+      .catch(() => applyProgress(0));
   };
 
   const onSave = async (myTake: string, mode: Mode) => {
-    if (!selection || progress === null) return;
+    if (!active || active.progress === null) return;
     setSaving(true);
     setError(null);
     try {
       const { material_id } = await createMaterial({
         book_id: id,
-        source_text: selection.text,
+        source_text: active.info.text,
         my_take: myTake,
-        chapter: selection.chapterTitle || null,
+        chapter: active.info.chapterTitle || null,
         highlighted_at: new Date().toISOString().slice(0, 10),
-        progress,
-        cfi: selection.cfi,
+        progress: active.progress,
+        cfi: active.info.cfi,
         source: "epub",
         mode,
       });
-      setSelection(null);
+      setPending((prev) => prev.filter((p) => p.info.cfi !== active.info.cfi));
+      setActiveCfi(null);
       setMaterials(await listBookMaterials(id));
       setNotice("已存为素材");
       setJob(await createJob(material_id));
@@ -737,6 +851,14 @@ export function Reader() {
           onBumpFont={bumpFont}
           onCycleSpread={cycleSpread}
         />
+        <PendingQueue
+          items={pending}
+          ui={ui}
+          onOpen={(cfi) => setActiveCfi(cfi)}
+          onDiscard={(cfi) =>
+            setPending((prev) => prev.filter((p) => p.info.cfi !== cfi))
+          }
+        />
       </div>
 
       {/* 可拖动分隔条 */}
@@ -776,7 +898,7 @@ export function Reader() {
         <h2 style={{ fontSize: 17, margin: "10px 0 2px", color: ui.text }}>{book?.title ?? "加载中…"}</h2>
         <p style={{ margin: 0, fontSize: 12, color: ui.sub }}>{book?.author}</p>
         <p style={{ fontSize: 12, color: ui.accent, marginTop: 10 }}>
-          选中正文里的一句话，就能写想法。
+          选中正文可连续划多处，右上角排队等待处理，点「写想法」再产出内容。
         </p>
 
         {notice ? (
@@ -820,13 +942,14 @@ export function Reader() {
         />
       </aside>
 
-      {selection ? (
+      {active ? (
         <TakeDialog
-          selection={selection}
-          progress={progress}
+          selection={active.info}
+          progress={active.progress}
           saving={saving}
           ui={ui}
-          onClose={() => setSelection(null)}
+          // 只是收起弹框，这条划线还留在右上角队列里，不会丢。
+          onClose={() => setActiveCfi(null)}
           onSave={onSave}
         />
       ) : null}
