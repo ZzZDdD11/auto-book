@@ -36,4 +36,5 @@ def health() -> dict[str, str]:
 
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
+    # v1 只在本机跑，前端 dev server 固定这个地址（和上面 CORS 白名单一致）
+    return RedirectResponse(url="http://localhost:5273")
