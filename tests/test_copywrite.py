@@ -29,3 +29,14 @@ def test_prompt_contains_all_frames():
 
     for expect in ("书名", "视频钩子", "原文金句", "作者观点", "我的想法", "结尾提问"):
         assert expect in prompt, f"prompt 缺少 {expect}"
+
+
+def test_prompt_lists_available_cards_for_gongzhonghao_placeholders():
+    """公众号占位标记 `[图: 卡i ...]` 的 i 必须能在 prompt 里的卡片列表找到，
+    不然 AI 会引用不存在的卡片编号。"""
+    script = script_with([None, None])
+    prompt = build_copy_prompt(script)
+
+    assert "可用卡片列表" in prompt
+    assert "卡0：封面" in prompt
+    assert "卡5：互动" in prompt

@@ -20,6 +20,7 @@ from sqlmodel import Session, select
 from backend.core import copywrite, render
 from backend.core import script as script_mod
 from backend.core import tts as tts_mod
+from backend.core.card import render_cards
 from backend.core.cover import render_covers
 from backend.core.deepseek import DeepSeekClient
 from backend.core.payload import FrameAudio, build_payload
@@ -173,9 +174,10 @@ def run_rendering(
     prepare_public: Callable = render.prepare_job_public_dir,
     render_video: Callable = render.render_video,
     make_covers: Callable = render_covers,
+    make_cards: Callable = render_cards,
     cleanup_public: Callable = render.cleanup_job_public_dir,
 ) -> None:
-    """阶段 3：脚本 + 配音 → 视频 + 封面。
+    """阶段 3：脚本 + 配音 → 视频 + 封面 + 图文卡片。
 
     整体渲染 —— Remotion 没法只渲一帧，全渲十几秒够快。
     每次渲染产出一个新版本（version+1），旧视频保留为历史。
@@ -251,6 +253,23 @@ def run_rendering(
                 )
             )
         session.commit()
+
+        # 图文卡片：附加产物，失败不影响出片，也不连带封面/视频
+        try:
+            cards = make_cards(script, work_dir / "cards")
+        except Exception as exc:  # noqa: BLE001
+            cards = {}
+            job.error = f"图文卡片生成失败（视频正常）：{type(exc).__name__}: {exc}"[:1000]
+        for index, path in cards.items():
+            session.add(
+                Asset(
+                    job_id=job.id,
+                    kind=f"card:{index}",
+                    path=str(path),
+                    version=version,
+                )
+            )
+        session.commit()
     finally:
         if prepared:
             cleanup_public(job.id or 0)
@@ -291,6 +310,7 @@ async def run_job(
     generate_copy: Callable = copywrite.generate_copy,
     cleanup_public: Callable = render.cleanup_job_public_dir,
     make_covers: Callable = render_covers,
+    make_cards: Callable = render_cards,
 ) -> None:
     """调度器：从 job.status 对应的阶段开始跑，直到 done 或 _pending。
 
@@ -336,6 +356,7 @@ async def run_job(
                 prepare_public=prepare_public,
                 render_video=render_video,
                 make_covers=make_covers,
+                make_cards=make_cards,
                 cleanup_public=cleanup_public,
             )
             _touch(session, job, JobStatus.render_pending)

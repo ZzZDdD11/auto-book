@@ -77,7 +77,7 @@ def render_cards(script: Script, out_dir: Path) -> dict[int, Path]: ...
 
 | kind | kicker | text | footer |
 |---|---|---|---|
-| hook | （空） | `hook.lines` 拼接 | 书名 · 作者 |
+| hook | （空） | `hook.lines` 拼接 | 今年第几本（书名/作者已在顶部书名条，footer 不重复） |
 | quote | 原文摘录 | `quote.text` | 第{chapter}章 · 读到{progress}% |
 | point ×N | 作者的意思是 {i}/{N} | `point.text` | `point.evidence`（为 `None` 时留空） |
 | my_take | 我的想法 | `my_take.text` | （空） |

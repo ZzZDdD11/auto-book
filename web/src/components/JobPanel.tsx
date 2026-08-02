@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   audioUrl,
+  cardUrl,
   listHistory,
   patchCopy,
   patchScriptFrame,
@@ -647,6 +648,34 @@ function VideoStep({ job, ui }: { job: JobOut; ui: JobPanelPalette }) {
                   }}
                 >
                   {r}
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {job.card_count > 0 ? (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: ui.sub, marginBottom: 6 }}>
+              图文卡片（小红书图集，共 {job.card_count} 张）
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {Array.from({ length: job.card_count }, (_, i) => (
+                <a
+                  key={i}
+                  href={cardUrl(job.id, i)}
+                  download
+                  style={{
+                    padding: "5px 10px",
+                    background: "#fff",
+                    color: ui.sub,
+                    borderRadius: 5,
+                    textDecoration: "none",
+                    fontSize: 11.5,
+                    border: "1px solid #ececec",
+                  }}
+                >
+                  第 {i + 1} 张
                 </a>
               ))}
             </div>

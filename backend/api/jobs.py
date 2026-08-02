@@ -62,6 +62,8 @@ class JobOut(BaseModel):
     copies: dict[str, Any] | None = None
     # 已产出的封面比例，供前端决定显示哪几个下载入口
     cover_ratios: list[str] = []
+    # 已产出的图文卡片张数，供前端生成下载链接列表（index 0..card_count-1）
+    card_count: int = 0
     # 当前视频版本号（最大 version）。None = 还没渲过
     video_version: int | None = None
     # 是否停在 _pending 等用户介入
@@ -72,12 +74,18 @@ class JobOut(BaseModel):
 
 def _to_out(job: Job, session: Session | None = None) -> JobOut:
     ratios: list[str] = []
+    card_count = 0
     video_version: int | None = None
     if session is not None and job.id is not None:
         rows = session.exec(
             select(Asset).where(Asset.job_id == job.id, Asset.kind.startswith("cover:"))  # type: ignore[union-attr]
         ).all()
         ratios = sorted({a.kind.split(":", 1)[1] for a in rows})
+
+        card_rows = session.exec(
+            select(Asset).where(Asset.job_id == job.id, Asset.kind.startswith("card:"))  # type: ignore[union-attr]
+        ).all()
+        card_count = len({a.kind.split(":", 1)[1] for a in card_rows})
 
         videos = session.exec(
             select(Asset).where(Asset.job_id == job.id, Asset.kind == "video")
@@ -99,6 +107,7 @@ def _to_out(job: Job, session: Session | None = None) -> JobOut:
         cost_tokens=job.cost_tokens,
         copies=json.loads(job.copy_json) if job.copy_json else None,
         cover_ratios=ratios,
+        card_count=card_count,
         video_version=video_version,
         auto_advance=job.auto_advance,
         script=script,
@@ -250,6 +259,34 @@ def download_cover(
         _asset_file(asset),
         media_type="image/png",
         filename=f"auto-book-{job_id}-{size.ratio}-v{asset.version}.png",
+    )
+
+
+@router.get("/{job_id}/card/{index}")
+def download_card(
+    job_id: int,
+    index: int,
+    session: SessionDep,
+    version: int | None = None,
+) -> FileResponse:
+    """下发图文卡片。index 只用来查库，不直接拼文件路径，不存在就 404。"""
+    cards = session.exec(
+        select(Asset).where(Asset.job_id == job_id, Asset.kind == f"card:{index}")
+    ).all()
+    if not cards:
+        raise HTTPException(status_code=404, detail="还没有这张卡片")
+
+    if version is None:
+        asset = max(cards, key=lambda a: a.version)
+    else:
+        asset = next((a for a in cards if a.version == version), None)
+        if asset is None:
+            raise HTTPException(status_code=404, detail=f"没有版本 {version}")
+
+    return FileResponse(
+        _asset_file(asset),
+        media_type="image/png",
+        filename=f"auto-book-{job_id}-card{index}-v{asset.version}.png",
     )
 
 
