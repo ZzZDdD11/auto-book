@@ -21,6 +21,8 @@ video/out/
 .worktrees/
 .DS_Store
 *.log
+*.tsbuildinfo
 
 # BGM 由 scripts/make_bgm.py 生成，不入库（每次生成结果一致）
 video/public/bgm/
+.gstack/

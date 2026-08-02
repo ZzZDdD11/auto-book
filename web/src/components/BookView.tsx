@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { ReactReader } from "react-reader";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { ReactReader, ReactReaderStyle, type IReactReaderStyle } from "react-reader";
 import type { Rendition } from "epubjs";
+import type { ReaderSettings } from "../hooks/useReaderSettings";
 
 export type SelectionInfo = {
   text: string;
@@ -15,6 +16,40 @@ type Props = {
   initialCfi?: string | null;
   onSelect: (info: SelectionInfo) => void;
   onPositionChange?: (cfi: string) => void;
+  settings: ReaderSettings;
+};
+
+/** 命令式句柄：点击划线时用它跳回原文位置。 */
+export type BookViewHandle = {
+  goto: (cfi: string) => void;
+};
+
+/** epub.js 注入到 iframe 内部的正文主题。键是 CSS 选择器。 */
+const DAY_THEME = {
+  body: { background: "#faf8f3", color: "#1a1a1a" },
+  p: { color: "#1a1a1a" },
+  a: { color: "#0a7d5a" },
+};
+
+const NIGHT_THEME = {
+  body: { background: "#1a1a1f", color: "#c9c9cf" },
+  p: { color: "#c9c9cf" },
+  a: { color: "#7fc7a8" },
+  "a:link": { color: "#7fc7a8" },
+  "a:visited": { color: "#6fae93" },
+};
+
+/** 双页排列的最小可用宽度（px）。窄于该值即使选了双页也退回单页。 */
+const SPREAD_MIN_WIDTH = 700;
+
+/** 夜间模式下 react-reader 外壳（标题、箭头、TOC）的样式覆盖。 */
+const NIGHT_READER_STYLES: IReactReaderStyle = {
+  ...ReactReaderStyle,
+  readerArea: { ...ReactReaderStyle.readerArea, backgroundColor: "#1a1a1f" },
+  titleArea: { ...ReactReaderStyle.titleArea, color: "#5a5a66" },
+  arrow: { ...ReactReaderStyle.arrow, color: "#3a3a44" },
+  arrowHover: { ...ReactReaderStyle.arrowHover, color: "#9a9aa6" },
+  tocButtonBar: { ...ReactReaderStyle.tocButtonBar, background: "#9a9aa6" },
 };
 
 /**
@@ -27,7 +62,10 @@ type Props = {
  *   1. 不能开 swipeable —— 它会禁用 iframe 内的文字选中，划线就没了
  *   2. 不能开 allowScriptedContent —— EPUB 是不可信输入，开了 sandbox 就失效
  */
-export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props) {
+export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
+  { url, initialCfi, onSelect, onPositionChange, settings },
+  ref,
+) {
   const [location, setLocation] = useState<string | number>(initialCfi ?? 0);
   // 必须用 state 而不是 ref：ref 赋值不触发重渲染，绑事件的 effect 就永远
   // 只在 rendition 还是 null 时跑过一次，selected 事件绑不上，划线会失效。
@@ -35,6 +73,15 @@ export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props)
   // 用 ref 存回调，避免 rendition 的事件监听绑到过期的闭包上
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+
+  // 暴露 goto：点击划线时把 location 设为该 CFI，react-reader 受控跳转。
+  useImperativeHandle(
+    ref,
+    () => ({
+      goto: (cfi: string) => setLocation(cfi),
+    }),
+    [],
+  );
 
   useEffect(() => {
     if (!rendition) return;
@@ -80,6 +127,49 @@ export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props)
     };
   }, [rendition]);
 
+  // 主题、字号、单双页各自独立 effect，避免互相触发无谓重算。
+  // effect 在 rendition 就绪后同步执行，早于首章内容加载，所以 select 不会闪屏。
+
+  // 主题：epub.js 的 themes.select 不会清掉旧主题注入的 <style>，同页来回切会
+  // 叠加多个主题样式表（后注入者胜），导致切回日间失效。这里在切换前手动移除
+  // 旧主题节点，保证同页切换干净。节点 id 形如 epubjs-inserted-css-{name}。
+  const prevThemeRef = useRef(settings.theme);
+  useEffect(() => {
+    if (!rendition) return;
+    const prev = prevThemeRef.current;
+    if (prev !== settings.theme) {
+      // getContents 运行时是数组，但 epub.js 的 .d.ts 错标成了单个 Contents
+      const contents = rendition.getContents() as unknown as {
+        document?: Document;
+      }[];
+      contents.forEach((c) => {
+        c.document
+          ?.getElementById(`epubjs-inserted-css-${prev}`)
+          ?.remove();
+      });
+      prevThemeRef.current = settings.theme;
+    }
+    rendition.themes.select(settings.theme);
+  }, [rendition, settings.theme]);
+
+  // 字号：override 按属性名覆盖，天然幂等。
+  useEffect(() => {
+    if (!rendition) return;
+    rendition.themes.fontSize(`${settings.fontSize}%`);
+  }, [rendition, settings.fontSize]);
+
+  // 单双页：spread() 内部会调 manager.updateLayout() 立即重排。
+  useEffect(() => {
+    if (!rendition) return;
+    rendition.spread(
+      settings.spread === "double" ? "auto" : "none",
+      SPREAD_MIN_WIDTH,
+    );
+  }, [rendition, settings.spread]);
+
+  const readerStyles =
+    settings.theme === "night" ? NIGHT_READER_STYLES : ReactReaderStyle;
+
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <ReactReader
@@ -89,13 +179,17 @@ export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props)
           setLocation(cfi);
           onPositionChange?.(cfi);
         }}
+        readerStyles={readerStyles}
         getRendition={(r) => {
           setRendition(r);
-          // 让选中在深色文字上也看得清
+          // 让选中在深色文字上也看得清；行高统一更易读
           r.themes.default({
             "::selection": { background: "rgba(232,184,75,0.35)" },
-            p: { "line-height": "1.8", "font-size": "1.05rem" },
+            p: { "line-height": "1.8" },
           });
+          r.themes.register("day", DAY_THEME);
+          r.themes.register("night", NIGHT_THEME);
+          // 实际套用（select/fontSize/spread）交给上面的 effect，那里更可控。
         }}
         // swipeable 会禁用 iframe 内文字选中，必须关
         swipeable={false}
@@ -112,4 +206,6 @@ export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props)
       />
     </div>
   );
-}
+});
+
+BookView.displayName = "BookView";
