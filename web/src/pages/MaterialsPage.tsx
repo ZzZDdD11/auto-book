@@ -72,7 +72,7 @@ export function MaterialsPage() {
                 <div>
                   {m.book_title ? (
                     <Link
-                      to={`/book/${m.book_id}`}
+                      to={`/read/${m.book_id}`}
                       style={{ fontSize: 13, color: "#0f2a24", textDecoration: "none", fontWeight: 600 }}
                     >
                       {m.book_title}
@@ -100,7 +100,7 @@ export function MaterialsPage() {
                 {m.job_id ? (
                   <>
                     <Link
-                      to={`/book/${m.book_id}`}
+                      to={`/read/${m.book_id}`}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -128,7 +128,7 @@ export function MaterialsPage() {
                   <span style={{ fontSize: 12, color: "#ccc" }}>未出过视频</span>
                 )}
                 <Link
-                  to={`/book/${m.book_id}`}
+                  to={`/read/${m.book_id}`}
                   style={{
                     marginLeft: "auto",
                     fontSize: 12,
