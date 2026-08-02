@@ -7,6 +7,7 @@ import {
   epubFileUrl,
   listBookMaterials,
   listBooks,
+  patchMaterial,
   savePosition,
   type BookOut,
   type MaterialBrief,
@@ -327,10 +328,12 @@ function MaterialList({
   materials,
   ui,
   onGoto,
+  onEdit,
 }: {
   materials: MaterialBrief[];
   ui: UiPalette;
   onGoto: (cfi: string) => void;
+  onEdit: (m: MaterialBrief) => void;
 }) {
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -452,15 +455,174 @@ function MaterialList({
                   {m.my_take ? (
                     <p style={{ margin: "6px 0 0", fontSize: 12, color: ui.accent }}>{m.my_take}</p>
                   ) : null}
-                  <p style={{ margin: "5px 0 0", fontSize: 11, color: ui.faint }}>
-                    {m.chapter ?? ""} {m.progress !== null ? `· ${m.progress}%` : ""}
-                    {m.cfi ? " · ↩" : ""}
-                  </p>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 5 }}>
+                    <p style={{ margin: 0, fontSize: 11, color: ui.faint }}>
+                      {m.chapter ?? ""} {m.progress !== null ? `· ${m.progress}%` : ""}
+                      {m.cfi ? " · ↩" : ""}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(m);
+                      }}
+                      style={{
+                        border: `1px solid ${ui.border}`,
+                        background: "transparent",
+                        color: ui.sub,
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      编辑
+                    </button>
+                  </div>
                 </div>
               ))}
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+/** 素材编辑弹框。改完调 patchMaterial，后端退回 scripting 重跑。 */
+function MaterialEditDialog({
+  material,
+  ui,
+  onClose,
+  onSaved,
+}: {
+  material: MaterialBrief;
+  ui: UiPalette;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [sourceText, setSourceText] = useState(material.source_text);
+  const [myTake, setMyTake] = useState(material.my_take);
+  const [chapter, setChapter] = useState(material.chapter ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const overlay: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.4)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+  };
+  const dialog: React.CSSProperties = {
+    background: ui.inputBg,
+    borderRadius: 10,
+    padding: 20,
+    width: "min(90vw, 480px)",
+    maxHeight: "80vh",
+    overflow: "auto",
+    color: ui.text,
+  };
+  const label: React.CSSProperties = {
+    fontSize: 11,
+    color: ui.sub,
+    marginBottom: 4,
+    display: "block",
+  };
+  const textarea: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "8px 10px",
+    fontSize: 13,
+    borderRadius: 6,
+    border: `1px solid ${ui.border}`,
+    background: ui.inputBg,
+    color: ui.text,
+    fontFamily: "inherit",
+    resize: "vertical",
+    outline: "none",
+  };
+
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={dialog} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>编辑素材</h3>
+
+        <label style={label}>划线原文</label>
+        <textarea
+          rows={3}
+          value={sourceText}
+          onChange={(e) => setSourceText(e.target.value)}
+          style={textarea}
+        />
+
+      <label style={{ ...label, marginTop: 12 }}>我的想法</label>
+      <textarea
+        rows={4}
+        value={myTake}
+        onChange={(e) => setMyTake(e.target.value)}
+        style={textarea}
+      />
+
+      <label style={{ ...label, marginTop: 12 }}>章节</label>
+      <input
+        value={chapter}
+        onChange={(e) => setChapter(e.target.value)}
+        style={{ ...textarea, height: 36, resize: "none" }}
+      />
+
+      <p style={{ fontSize: 11, color: ui.faint, marginTop: 12, lineHeight: 1.5 }}>
+        保存后，最新的关联任务会退回「AI 写脚本」重跑。
+        旧视频保留为历史版本。
+      </p>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+        <button
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await patchMaterial(material.id, {
+                source_text: sourceText,
+                my_take: myTake,
+                chapter: chapter || null,
+              });
+              onSaved();
+            } catch (e) {
+              alert(String(e));
+            } finally {
+              setSaving(false);
+            }
+          }}
+          disabled={saving}
+          style={{
+            flex: 1,
+            padding: "9px",
+            border: "none",
+            borderRadius: 6,
+            background: ui.accent,
+            color: ui.accentText,
+            fontSize: 14,
+            cursor: saving ? "default" : "pointer",
+          }}
+        >
+          {saving ? "保存中…" : "保存并重跑"}
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            padding: "9px 16px",
+            border: `1px solid ${ui.border}`,
+            borderRadius: 6,
+            background: "transparent",
+            color: ui.sub,
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          取消
+        </button>
+      </div>
+      </div>
     </div>
   );
 }
@@ -480,6 +642,7 @@ export function Reader() {
   const [progress, setProgress] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editMaterial, setEditMaterial] = useState<MaterialBrief | null>(null);
   const { job, setJob, error, setError, running } = useJobPolling();
 
   useEffect(() => {
@@ -592,6 +755,7 @@ export function Reader() {
           ) : (
             <JobPanel
               job={job}
+              setJob={setJob}
               ui={{
                 border: ui.border,
                 panelAlt: ui.panelAlt,
@@ -613,6 +777,7 @@ export function Reader() {
           materials={materials}
           ui={ui}
           onGoto={(cfi) => bookRef.current?.goto(cfi)}
+          onEdit={(m) => setEditMaterial(m)}
         />
       </aside>
 
@@ -624,6 +789,22 @@ export function Reader() {
           ui={ui}
           onClose={() => setSelection(null)}
           onSave={onSave}
+        />
+      ) : null}
+
+      {editMaterial ? (
+        <MaterialEditDialog
+          material={editMaterial}
+          ui={ui}
+          onClose={() => setEditMaterial(null)}
+          onSaved={async () => {
+            setEditMaterial(null);
+            setNotice("素材已修改，最新任务正在重跑");
+            // 刷新素材列表
+            if (bookId) {
+              setMaterials(await listBookMaterials(Number(bookId)));
+            }
+          }}
         />
       ) : null}
     </div>

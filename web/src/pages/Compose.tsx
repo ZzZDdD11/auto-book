@@ -152,7 +152,7 @@ export function Compose() {
       {error ? (
         <p style={{ color: "#b5301a", fontSize: 14, whiteSpace: "pre-wrap" }}>{error}</p>
       ) : null}
-      {job ? <JobPanel job={job} /> : null}
+      {job ? <JobPanel job={job} setJob={setJob} /> : null}
     </main>
   );
 }
