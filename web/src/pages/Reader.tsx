@@ -7,13 +7,15 @@ import {
   epubFileUrl,
   listBookMaterials,
   listBooks,
+  listCheckpoints,
   patchMaterial,
   savePosition,
   type BookOut,
+  type CheckpointOut,
   type MaterialBrief,
   type Mode,
 } from "../api";
-import { BookView, type BookViewHandle, type SelectionInfo } from "../components/BookView";
+import { BookView, type BookViewHandle, type PositionInfo, type SelectionInfo } from "../components/BookView";
 import { JobPanel, STATUS_LABEL } from "../components/JobPanel";
 import { useJobPolling } from "../hooks/useJobPolling";
 import {
@@ -733,6 +735,138 @@ function MaterialEditDialog({
   );
 }
 
+function formatCheckpointTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 一条进度节点：历史记忆点或者当前位置。 */
+type ProgressNode = {
+  cfi: string;
+  chapter: string | null;
+  progress: number;
+  label: string;
+  current: boolean;
+};
+
+/**
+ * 侧栏「阅读进度」区块：上面是进度条+节点，下面是文字列表，同一份数据。
+ * 没读过（没有 last_cfi）就不渲染，避免出现一条空进度条。
+ */
+function ReadingProgress({
+  book,
+  checkpoints,
+  ui,
+  onGoto,
+}: {
+  book: BookOut;
+  checkpoints: CheckpointOut[];
+  ui: UiPalette;
+  onGoto: (cfi: string) => void;
+}) {
+  if (!book.last_cfi || book.last_progress === null) return null;
+
+  const nodes: ProgressNode[] = [
+    ...checkpoints
+      .filter((c) => c.progress !== null)
+      .map((c) => ({
+        cfi: c.cfi,
+        chapter: c.chapter,
+        progress: c.progress as number,
+        label: formatCheckpointTime(c.created_at),
+        current: false,
+      })),
+    {
+      cfi: book.last_cfi,
+      chapter: book.last_chapter,
+      progress: book.last_progress,
+      label: "现在",
+      current: true,
+    },
+  ];
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <h3 style={{ fontSize: 14, marginTop: 0, marginBottom: 10, color: ui.sub }}>阅读进度</h3>
+
+      <div style={{ position: "relative", height: 24, margin: "0 8px 10px" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 0,
+            right: 0,
+            height: 3,
+            borderRadius: 2,
+            background: ui.border,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 0,
+            width: `${book.last_progress}%`,
+            height: 3,
+            borderRadius: 2,
+            background: ui.accent,
+          }}
+        />
+        {nodes.map((n) => (
+          <div
+            key={n.cfi}
+            onClick={() => onGoto(n.cfi)}
+            title={`${n.label} · ${n.chapter ?? "未知章节"} · ${n.progress}%`}
+            style={{
+              position: "absolute",
+              top: n.current ? 3 : 5,
+              left: `calc(${n.progress}% - ${n.current ? 8 : 6}px)`,
+              width: n.current ? 16 : 12,
+              height: n.current ? 16 : 12,
+              borderRadius: "50%",
+              background: n.current ? ui.marker : ui.panel,
+              border: `2px solid ${n.current ? ui.marker : ui.accent}`,
+              cursor: "pointer",
+              boxShadow: n.current ? `0 0 0 3px ${ui.marker}40` : "none",
+            }}
+          />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {nodes
+          .slice()
+          .reverse()
+          .map((n) => (
+            <div
+              key={n.cfi}
+              onClick={() => onGoto(n.cfi)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "6px 10px",
+                borderRadius: 7,
+                background: n.current ? ui.panelAlt : "transparent",
+                border: `1px solid ${n.current ? ui.accent : ui.border}`,
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: n.current ? ui.text : ui.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {n.label} · {n.chapter ?? "未知章节"}
+              </span>
+              <span style={{ color: n.current ? ui.accent : ui.faint, fontWeight: n.current ? 600 : 400, flexShrink: 0, marginLeft: 8 }}>
+                {n.progress}%
+              </span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export function Reader() {
   const { bookId } = useParams<{ bookId: string }>();
   const id = Number(bookId);
@@ -744,6 +878,7 @@ export function Reader() {
 
   const [book, setBook] = useState<BookOut | null>(null);
   const [materials, setMaterials] = useState<MaterialBrief[]>([]);
+  const [checkpoints, setCheckpoints] = useState<CheckpointOut[]>([]);
   // 划线先进队列，不立刻弹窗，允许连续划第二、第三条；
   // 点队列里某一条的「写想法」才打开 TakeDialog（用 cfi 定位当前是哪条）。
   const [pending, setPending] = useState<PendingSelection[]>([]);
@@ -761,6 +896,7 @@ export function Reader() {
         const all = await listBooks();
         setBook(all.find((b) => b.id === id) ?? null);
         setMaterials(await listBookMaterials(id));
+        setCheckpoints(await listCheckpoints(id));
       } catch (e) {
         setError(String(e));
       }
@@ -839,8 +975,8 @@ export function Reader() {
           url={epubFileUrl(id)}
           initialCfi={book?.last_cfi ?? null}
           onSelect={onSelect}
-          onPositionChange={(cfi) => {
-            void savePosition(id, cfi).catch(() => {});
+          onPositionChange={(info: PositionInfo) => {
+            void savePosition(id, info).catch(() => {});
           }}
           settings={settings}
         />
@@ -929,6 +1065,15 @@ export function Reader() {
               }}
             />
           )
+        ) : null}
+
+        {book ? (
+          <ReadingProgress
+            book={book}
+            checkpoints={checkpoints}
+            ui={ui}
+            onGoto={(cfi) => bookRef.current?.goto(cfi)}
+          />
         ) : null}
 
         <h3 style={{ fontSize: 14, marginTop: 26, marginBottom: 10, color: ui.sub }}>

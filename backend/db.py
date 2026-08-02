@@ -33,6 +33,9 @@ _MIGRATIONS: dict[tuple[str, str], str] = {
     ("job", "auto_advance"): "BOOLEAN NOT NULL DEFAULT 1",
     ("job", "script_json_history"): "TEXT",
     ("asset", "version"): "INTEGER NOT NULL DEFAULT 1",
+    ("book", "last_chapter"): "TEXT",
+    ("book", "last_progress"): "INTEGER",
+    ("book", "last_opened_at"): "TIMESTAMP",
 }
 
 

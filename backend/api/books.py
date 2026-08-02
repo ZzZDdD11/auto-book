@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from backend.core.epub import Chapter, EpubError, compute_progress, parse_epub, validate_and_hash
+from backend.core.reading import record_position
 from backend.db import get_session
-from backend.models import Book, Material
+from backend.models import Book, Material, ReadingCheckpoint
 from backend.settings import get_settings
 
 router = APIRouter(prefix="/api/books", tags=["books"])
@@ -41,12 +42,25 @@ class BookOut(BaseModel):
     author: str
     total_chars: int
     last_cfi: str | None
+    last_chapter: str | None
+    last_progress: int | None
+    last_opened_at: str | None
     has_cover: bool
     material_count: int
 
 
 class PositionIn(BaseModel):
     cfi: str = Field(min_length=1, max_length=500)
+    chapter_index: int = Field(ge=0)
+    fraction: float = Field(ge=0, le=1)
+    chapter_title: str = Field(default="", max_length=200)
+
+
+class CheckpointOut(BaseModel):
+    cfi: str
+    chapter: str | None
+    progress: int | None
+    created_at: str
 
 
 class ProgressIn(BaseModel):
@@ -157,6 +171,9 @@ def _to_out(book: Book, session: Session) -> BookOut:
         author=book.author,
         total_chars=book.total_chars,
         last_cfi=book.last_cfi,
+        last_chapter=book.last_chapter,
+        last_progress=book.last_progress,
+        last_opened_at=book.last_opened_at.isoformat() if book.last_opened_at else None,
         has_cover=bool(book.cover_path),
         material_count=count,
     )
@@ -167,7 +184,11 @@ def list_books(session: SessionDep) -> list[BookOut]:
     books = session.exec(
         select(Book)
         .where(Book.user_id == get_settings().default_user_id)
-        .order_by(Book.created_at.desc())  # type: ignore[union-attr]
+        .order_by(
+            Book.last_opened_at.isnot(None).desc(),  # type: ignore[union-attr]
+            Book.last_opened_at.desc(),  # type: ignore[union-attr]
+            Book.created_at.desc(),  # type: ignore[union-attr]
+        )
     ).all()
     return [_to_out(b, session) for b in books]
 
@@ -193,10 +214,38 @@ def get_cover(book_id: int, session: SessionDep) -> FileResponse:
 
 @router.post("/{book_id}/position", status_code=status.HTTP_204_NO_CONTENT)
 def save_position(book_id: int, payload: PositionIn, session: SessionDep) -> None:
+    """上报阅读位置。可能顺带产生一条历史记忆点，见 record_position。"""
     book = _owned_book(book_id, session)
-    book.last_cfi = payload.cfi
-    session.add(book)
-    session.commit()
+    progress = compute_progress(
+        _chapters_of(book), book.total_chars, payload.chapter_index, payload.fraction
+    )
+    record_position(
+        session,
+        book,
+        cfi=payload.cfi,
+        chapter=payload.chapter_title or None,
+        progress=progress,
+    )
+
+
+@router.get("/{book_id}/checkpoints", response_model=list[CheckpointOut])
+def list_checkpoints(book_id: int, session: SessionDep) -> list[CheckpointOut]:
+    """最近的历史记忆点（不含「现在」，那条数据已经在 BookOut 里）。"""
+    _owned_book(book_id, session)
+    rows = session.exec(
+        select(ReadingCheckpoint)
+        .where(ReadingCheckpoint.book_id == book_id)
+        .order_by(ReadingCheckpoint.created_at.desc())  # type: ignore[union-attr]
+    ).all()
+    return [
+        CheckpointOut(
+            cfi=r.cfi,
+            chapter=r.chapter,
+            progress=r.progress,
+            created_at=r.created_at.isoformat(),
+        )
+        for r in rows
+    ]
 
 
 @router.post("/{book_id}/progress")

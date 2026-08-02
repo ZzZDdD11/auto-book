@@ -96,6 +96,7 @@ export type JobOut = {
   cost_tokens: number;
   copies: Record<string, CopyVariant> | null;
   cover_ratios: string[];
+  card_count: number;
   video_version: number | null;
   auto_advance: boolean;
   script: Script | null;
@@ -107,8 +108,19 @@ export type BookOut = {
   author: string;
   total_chars: number;
   last_cfi: string | null;
+  last_chapter: string | null;
+  last_progress: number | null;
+  last_opened_at: string | null;
   has_cover: boolean;
   material_count: number;
+};
+
+/** 一条历史记忆点：某次阅读时段结束时停留的位置。 */
+export type CheckpointOut = {
+  cfi: string;
+  chapter: string | null;
+  progress: number | null;
+  created_at: string;
 };
 
 export type MaterialBrief = {
@@ -181,14 +193,27 @@ export const calcProgress = (bookId: number, chapterIndex: number, fraction: num
     fraction,
   });
 
-export async function savePosition(bookId: number, cfi: string): Promise<void> {
+/** 上报阅读位置。chapterIndex/fraction 用来让后端算全书进度，chapterTitle 是显示用的标签。 */
+export async function savePosition(
+  bookId: number,
+  info: { cfi: string; chapterIndex: number; fraction: number; chapterTitle: string },
+): Promise<void> {
   const resp = await fetch(`/api/books/${bookId}/position`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cfi }),
+    body: JSON.stringify({
+      cfi: info.cfi,
+      chapter_index: info.chapterIndex,
+      fraction: info.fraction,
+      chapter_title: info.chapterTitle,
+    }),
   });
   if (!resp.ok) throw new Error(await readError(resp));
 }
+
+/** 该书最近的历史记忆点（不含「现在」，那条数据在 BookOut 里）。 */
+export const listCheckpoints = (bookId: number) =>
+  get<CheckpointOut[]>(`/api/books/${bookId}/checkpoints`);
 
 export async function uploadEpub(file: File): Promise<BookOut> {
   const form = new FormData();
@@ -250,6 +275,10 @@ export const videoUrl = (jobId: number, version?: number) =>
 /** 某一帧配音的播放地址。 */
 export const audioUrl = (jobId: number, frame: FrameName) =>
   `/api/jobs/${jobId}/audio/${frame}`;
+
+/** 图文卡片下载地址。index 从 0 起。 */
+export const cardUrl = (jobId: number, index: number) =>
+  `/api/jobs/${jobId}/card/${index}`;
 
 /** 素材列表项（带关联书名和最新 job 状态）。 */
 export type MaterialWithJob = {

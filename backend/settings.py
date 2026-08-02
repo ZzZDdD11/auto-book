@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     max_epub_entries: int = 5000
     max_epub_uncompressed_bytes: int = 400 * 1024 * 1024
 
+    # 距上次上报阅读位置超过这个时长，算「另一次坐下来读」，
+    # 会把上一段停留的位置存成一条历史记忆点。
+    reading_session_gap_minutes: int = 30
+
     @property
     def epub_dir(self) -> Path:
         return self.storage_dir / "epubs"

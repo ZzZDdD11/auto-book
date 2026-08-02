@@ -62,6 +62,28 @@ class Book(SQLModel, table=True):
     chapters_json: str | None = None
     # 上次读到哪（EPUB CFI），重开自动跳回
     last_cfi: str | None = None
+    # 当前位置的章节标题/全书进度，跟 last_cfi 一起更新，
+    # 侧栏「现在」这一条展示时复用，不用重新算一次
+    last_chapter: str | None = None
+    last_progress: int | None = None
+    # 最近一次上报阅读位置的时间，用于书架排序与判断阅读时段是否已结束
+    last_opened_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class ReadingCheckpoint(SQLModel, table=True):
+    """一条历史记忆点：某次阅读时段结束时停留的位置。
+
+    只在「距上次上报超过 session_gap」时才新增一条 —— 按阅读时段聚合，
+    不是每次翻页都记，否则列表会被刷屏。每本书最多保留最近 5 条，
+    见 backend/core/reading.py。
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    book_id: int = Field(foreign_key="book.id", index=True)
+    cfi: str
+    chapter: str | None = None
+    progress: int | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 

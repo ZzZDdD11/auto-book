@@ -11,11 +11,18 @@ export type SelectionInfo = {
   fraction: number;
 };
 
+export type PositionInfo = {
+  cfi: string;
+  chapterIndex: number;
+  fraction: number;
+  chapterTitle: string;
+};
+
 type Props = {
   url: string;
   initialCfi?: string | null;
   onSelect: (info: SelectionInfo) => void;
-  onPositionChange?: (cfi: string) => void;
+  onPositionChange?: (info: PositionInfo) => void;
   settings: ReaderSettings;
 };
 
@@ -41,6 +48,38 @@ const NIGHT_THEME = {
 
 /** 双页排列的最小可用宽度（px）。窄于该值即使选了双页也退回单页。 */
 const SPREAD_MIN_WIDTH = 700;
+
+/**
+ * 从 epub.js 的当前位置算出「章节索引 / 章内比例 / 章节标题」。
+ *
+ * 划线（selected 事件）和翻页上报（locationChanged）都要用同一份数据，
+ * 抽成共享函数，不重复写这段容易出错的 epub.js 内部结构读取逻辑。
+ * 注意：epub.js 拿不到全书进度，fraction 只是章节内的，全书百分比
+ * 由后端用字数表换算。
+ */
+function currentLocationInfo(rendition: Rendition): { chapterIndex: number; fraction: number; chapterTitle: string } {
+  const loc = rendition.currentLocation() as unknown as {
+    start?: { index?: number; displayed?: { page?: number; total?: number } };
+  };
+  const index = loc?.start?.index ?? 0;
+  const page = loc?.start?.displayed?.page ?? 1;
+  const total = loc?.start?.displayed?.total ?? 1;
+
+  let title = "";
+  try {
+    const spineItem = rendition.book.spine.get(index) as unknown as { href?: string };
+    const nav = rendition.book.navigation?.get(spineItem?.href ?? "");
+    title = (nav?.label ?? "").trim();
+  } catch {
+    title = "";
+  }
+
+  return {
+    chapterIndex: index,
+    fraction: total > 0 ? Math.min(1, page / total) : 0,
+    chapterTitle: title,
+  };
+}
 
 /** 夜间模式下 react-reader 外壳（标题、箭头、TOC）的样式覆盖。 */
 const NIGHT_READER_STYLES: IReactReaderStyle = {
@@ -92,30 +131,14 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       if (!text) return;
 
       // 章节索引与章内比例都来自 epub.js 的当前位置。
-      // 注意：epub.js 拿不到全书进度，fraction 只是章节内的，
-      // 全书百分比由后端用字数表换算。
-      const loc = rendition.currentLocation() as unknown as {
-        start?: { index?: number; displayed?: { page?: number; total?: number } };
-      };
-      const index = loc?.start?.index ?? 0;
-      const page = loc?.start?.displayed?.page ?? 1;
-      const total = loc?.start?.displayed?.total ?? 1;
-
-      let title = "";
-      try {
-        const spineItem = rendition.book.spine.get(index) as unknown as { href?: string };
-        const nav = rendition.book.navigation?.get(spineItem?.href ?? "");
-        title = (nav?.label ?? "").trim();
-      } catch {
-        title = "";
-      }
+      const { chapterIndex, fraction, chapterTitle } = currentLocationInfo(rendition);
 
       onSelectRef.current({
         text,
         cfi,
-        chapterIndex: index,
-        chapterTitle: title,
-        fraction: total > 0 ? Math.min(1, page / total) : 0,
+        chapterIndex,
+        chapterTitle,
+        fraction,
       });
       // 弹框出现后清掉选区，避免遮挡
       contents.window.getSelection()?.removeAllRanges();
@@ -245,7 +268,10 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
         location={location}
         locationChanged={(cfi: string) => {
           setLocation(cfi);
-          onPositionChange?.(cfi);
+          if (onPositionChange && rendition) {
+            const { chapterIndex, fraction, chapterTitle } = currentLocationInfo(rendition);
+            onPositionChange({ cfi, chapterIndex, fraction, chapterTitle });
+          }
         }}
         readerStyles={readerStyles}
         getRendition={(r) => {
