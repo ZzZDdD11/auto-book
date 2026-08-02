@@ -282,7 +282,7 @@ export function JobPanel({
   );
 }
 
-/** 可折叠的环节块。标题行有状态图标 + 名称 + 展开/折叠箭头。 */
+/** 可折叠的环节块。每个是一张独立卡片，边界清晰。 */
 function StepBlock({
   label,
   stage,
@@ -311,10 +311,14 @@ function StepBlock({
   return (
     <div
       style={{
-        borderBottom: `1px solid ${ui.border}`,
-        padding: "10px 0",
+        marginBottom: 10,
+        borderRadius: 10,
+        background: "#fff",
+        border: `1px solid ${ss === "pending_review" ? color : "#e0dedb"}`,
+        overflow: "hidden",
       }}
     >
+      {/* 标题行：卡片头部，有自己的背景色 */}
       <button
         onClick={() => setOpen(!open)}
         style={{
@@ -322,25 +326,64 @@ function StepBlock({
           alignItems: "center",
           gap: 10,
           width: "100%",
-          background: "transparent",
+          background: ss === "pending_review" ? `${color}10` : "#faf9f7",
           border: "none",
+          borderBottom: open ? `1px solid #ececec` : "none",
+          padding: "11px 14px",
           cursor: "pointer",
           color: ui.text,
           fontSize: 14,
           fontFamily: "inherit",
           textAlign: "left",
+          transition: "background 0.15s",
         }}
       >
-        <span style={{ color, fontSize: 14, width: 16, textAlign: "center" }}>{icon}</span>
+        <span
+          style={{
+            color,
+            fontSize: 14,
+            width: 18,
+            textAlign: "center",
+            fontWeight: 700,
+          }}
+        >
+          {icon}
+        </span>
         <span style={{ fontWeight: 600 }}>{label}</span>
         {ss === "pending_review" ? (
-          <span style={{ fontSize: 11, color, background: `${color}22`, padding: "1px 7px", borderRadius: 8 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: "#fff",
+              background: color,
+              padding: "1px 7px",
+              borderRadius: 8,
+              fontWeight: 600,
+            }}
+          >
             待审
           </span>
+        ) : ss === "active" ? (
+          <span
+            style={{
+              fontSize: 10,
+              color: color,
+              padding: "1px 7px",
+              borderRadius: 8,
+              background: `${color}15`,
+            }}
+          >
+            进行中
+          </span>
         ) : null}
-        <span style={{ marginLeft: "auto", color: ui.sub, fontSize: 12 }}>{open ? "▼" : "▶"}</span>
+        <span style={{ marginLeft: "auto", color: ui.sub, fontSize: 11 }}>
+          {open ? "收起 ▲" : "展开 ▼"}
+        </span>
       </button>
-      {open ? <div style={{ marginTop: 10, paddingLeft: 26 }}>{children}</div> : null}
+      {/* 内容区：浅灰底，和标题行区分开 */}
+      {open ? (
+        <div style={{ padding: "14px 16px", background: "#f8f7f5" }}>{children}</div>
+      ) : null}
     </div>
   );
 }
@@ -537,8 +580,16 @@ function FrameBlock({
   };
 
   return (
-    <div style={{ marginTop: 10, paddingBottom: 10, borderBottom: `1px solid ${ui.border}` }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+    <div
+      style={{
+        marginTop: 8,
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "#fff",
+        border: "1px solid #ececec",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <span style={{ fontSize: 11, color: ui.sub, fontWeight: 600 }}>{label}</span>
         <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
           {editing ? (
