@@ -430,30 +430,114 @@ function ScriptStep({
   return (
     <div style={{ fontSize: 13 }}>
       <p style={{ margin: "0 0 10px", fontSize: 11, color: ui.sub }}>
-        点「编辑/重写」改文字或让 AI 重新写这一帧。
+        点「编辑」直接改文字，或点「AI 重写」让它重新写这一帧。
       </p>
-      <FrameBlock name="hook" label={FRAME_LABELS.hook} ui={ui} busy={busy} editing={editingFrame === "hook"} onEdit={() => onEditFrame("hook")} onCancel={onCancelEdit} onPatch={onPatchFrame} onRegenerate={onRegenerate}>
-        {script.hook.lines.map((l, i) => (
-          <span key={i} style={{ fontWeight: 700 }}>{l === script.hook.highlight ? `★ ${l}` : l}{i < script.hook.lines.length - 1 ? " / " : ""}</span>
-        ))}
+
+      <FrameBlock
+        name="hook"
+        label={FRAME_LABELS.hook}
+        ui={ui}
+        busy={busy}
+        editing={editingFrame === "hook"}
+        onEdit={() => onEditFrame("hook")}
+        onCancel={onCancelEdit}
+        onRegenerate={onRegenerate}
+        editor={<HookEditor data={script.hook} onSubmit={(p) => onPatchFrame("hook", p)} ui={ui} />}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {script.hook.lines.map((l, i) => (
+            <span
+              key={i}
+              style={{
+                fontWeight: 700,
+                fontSize: 15,
+                color: l === script.hook.highlight ? "#e8b84b" : ui.text,
+              }}
+            >
+              {l === script.hook.highlight ? `★ ${l}` : l}
+            </span>
+          ))}
+        </div>
       </FrameBlock>
-      <FrameBlock name="quote" label={FRAME_LABELS.quote} ui={ui} busy={busy} editing={editingFrame === "quote"} onEdit={() => onEditFrame("quote")} onCancel={onCancelEdit} onPatch={onPatchFrame} onRegenerate={onRegenerate}>
-        <span style={{ fontStyle: "italic" }}>{script.quote.text}</span>
-        {script.quote.chapter ? <span style={{ color: ui.sub }}>　{script.quote.chapter}</span> : null}
+
+      <FrameBlock
+        name="quote"
+        label={FRAME_LABELS.quote}
+        ui={ui}
+        busy={busy}
+        editing={editingFrame === "quote"}
+        onEdit={() => onEditFrame("quote")}
+        onCancel={onCancelEdit}
+        onRegenerate={onRegenerate}
+        editor={<QuoteEditor data={script.quote} onSubmit={(p) => onPatchFrame("quote", p)} ui={ui} />}
+      >
+        <span style={{ fontStyle: "italic" }}>「{script.quote.text}」</span>
+        <div style={{ marginTop: 4, fontSize: 11, color: ui.sub }}>
+          {script.quote.chapter ? `${script.quote.chapter} · ` : ""}
+          进度 {script.quote.progress}%
+        </div>
       </FrameBlock>
-      <FrameBlock name="breakdown" label={FRAME_LABELS.breakdown} ui={ui} busy={busy} editing={editingFrame === "breakdown"} onEdit={() => onEditFrame("breakdown")} onCancel={onCancelEdit} onPatch={onPatchFrame} onRegenerate={onRegenerate}>
+
+      <FrameBlock
+        name="breakdown"
+        label={FRAME_LABELS.breakdown}
+        ui={ui}
+        busy={busy}
+        editing={editingFrame === "breakdown"}
+        onEdit={() => onEditFrame("breakdown")}
+        onCancel={onCancelEdit}
+        onRegenerate={onRegenerate}
+        editor={
+          <BreakdownEditor
+            data={script.breakdown}
+            onSubmit={(p) => onPatchFrame("breakdown", p)}
+            ui={ui}
+          />
+        }
+      >
+        <div style={{ fontSize: 11, color: ui.sub, marginBottom: 4 }}>{script.breakdown.kicker}</div>
         {script.breakdown.points.map((p, i) => (
-          <div key={i} style={{ marginBottom: 5 }}>
-            <span style={{ fontWeight: 600 }}>{i + 1}. {p.text}</span>
-            {p.evidence ? <span style={{ color: ui.sub }}>　原文「{p.evidence}」</span> : null}
+          <div key={i} style={{ marginBottom: 6 }}>
+            <span style={{ fontWeight: 600 }}>
+              {i + 1}. {p.text}
+            </span>
+            {p.evidence ? (
+              <div style={{ color: ui.sub, fontSize: 12, marginTop: 2 }}>原文「{p.evidence}」</div>
+            ) : null}
           </div>
         ))}
       </FrameBlock>
-      <FrameBlock name="my_take" label={FRAME_LABELS.my_take} ui={ui} busy={busy} editing={editingFrame === "my_take"} onEdit={() => onEditFrame("my_take")} onCancel={onCancelEdit} onPatch={onPatchFrame} onRegenerate={onRegenerate}>
+
+      <FrameBlock
+        name="my_take"
+        label={FRAME_LABELS.my_take}
+        ui={ui}
+        busy={busy}
+        editing={editingFrame === "my_take"}
+        onEdit={() => onEditFrame("my_take")}
+        onCancel={onCancelEdit}
+        onRegenerate={onRegenerate}
+        editor={<MyTakeEditor data={script.my_take} onSubmit={(p) => onPatchFrame("my_take", p)} ui={ui} />}
+      >
+        <div style={{ fontSize: 11, color: ui.sub, marginBottom: 4 }}>{script.my_take.kicker}</div>
         <span>{script.my_take.text}</span>
       </FrameBlock>
-      <FrameBlock name="outro" label={FRAME_LABELS.outro} ui={ui} busy={busy} editing={editingFrame === "outro"} onEdit={() => onEditFrame("outro")} onCancel={onCancelEdit} onPatch={onPatchFrame} onRegenerate={onRegenerate}>
-        <span>{script.outro.question}</span>
+
+      <FrameBlock
+        name="outro"
+        label={FRAME_LABELS.outro}
+        ui={ui}
+        busy={busy}
+        editing={editingFrame === "outro"}
+        onEdit={() => onEditFrame("outro")}
+        onCancel={onCancelEdit}
+        onRegenerate={onRegenerate}
+        editor={<OutroEditor data={script.outro} onSubmit={(p) => onPatchFrame("outro", p)} ui={ui} />}
+      >
+        <span style={{ fontWeight: 600 }}>{script.outro.question}</span>
+        <div style={{ marginTop: 4, fontSize: 11, color: ui.sub }}>
+          {script.outro.footer_lines.join(" · ")}
+        </div>
       </FrameBlock>
     </div>
   );
@@ -538,25 +622,90 @@ function CopyStep({
   const [saving, setSaving] = useState(false);
 
   const inputStyle: React.CSSProperties = {
-    width: "100%", boxSizing: "border-box", padding: "6px 8px", fontSize: 13,
-    borderRadius: 5, border: `1px solid ${ui.border}`, background: "transparent",
-    color: ui.text, fontFamily: "inherit", outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "7px 10px",
+    fontSize: 13.5,
+    borderRadius: 6,
+    border: "1px solid #ddd",
+    background: "#fff",
+    color: ui.text,
+    fontFamily: "inherit",
+    outline: "none",
   };
 
   return (
     <div>
       {Object.entries(edited).map(([platform, v]) => (
-        <div key={platform} style={{ marginBottom: 14 }}>
-          <h3 style={{ fontSize: 13, margin: "0 0 6px" }}>{platform}</h3>
-          <input value={v.title} onChange={(e) => setEdited({ ...edited, [platform]: { ...v, title: e.target.value } })} style={{ ...inputStyle, marginBottom: 5, fontWeight: 600 }} />
-          <textarea value={v.body} onChange={(e) => setEdited({ ...edited, [platform]: { ...v, body: e.target.value } })} rows={3} style={{ ...inputStyle, marginBottom: 5, resize: "vertical" }} />
-          <input value={v.tags.join(" ")} onChange={(e) => setEdited({ ...edited, [platform]: { ...v, tags: e.target.value.split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean) } })} style={{ ...inputStyle, fontSize: 12, color: ui.sub }} />
+        <div
+          key={platform}
+          style={{
+            marginBottom: 12,
+            padding: "10px 12px",
+            background: "#fff",
+            borderRadius: 8,
+            border: "1px solid #ececec",
+          }}
+        >
+          <h3 style={{ fontSize: 12, margin: "0 0 8px", color: "#888", fontWeight: 700 }}>{platform}</h3>
+          <div style={{ ...fieldLabel, marginBottom: 4 }}>
+            <span>标题</span>
+          </div>
+          <input
+            value={v.title}
+            onChange={(e) => setEdited({ ...edited, [platform]: { ...v, title: e.target.value } })}
+            style={{ ...inputStyle, marginBottom: 8, fontWeight: 600 }}
+          />
+          <div style={{ ...fieldLabel, marginBottom: 4 }}>
+            <span>正文</span>
+          </div>
+          <textarea
+            value={v.body}
+            onChange={(e) => setEdited({ ...edited, [platform]: { ...v, body: e.target.value } })}
+            rows={4}
+            style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }}
+          />
+          <div style={{ ...fieldLabel, marginBottom: 4 }}>
+            <span>标签（空格分隔）</span>
+          </div>
+          <input
+            value={v.tags.join(" ")}
+            onChange={(e) =>
+              setEdited({
+                ...edited,
+                [platform]: {
+                  ...v,
+                  tags: e.target.value.split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean),
+                },
+              })
+            }
+            style={{ ...inputStyle, fontSize: 12, color: ui.sub }}
+          />
         </div>
       ))}
       <button
-        onClick={async () => { setSaving(true); try { setJob(await patchCopy(jobId, edited)); } catch (e) { alert(String(e)); } finally { setSaving(false); } }}
+        onClick={async () => {
+          setSaving(true);
+          try {
+            setJob(await patchCopy(jobId, edited));
+          } catch (e) {
+            alert(String(e));
+          } finally {
+            setSaving(false);
+          }
+        }}
         disabled={saving || busy}
-        style={{ padding: "6px 14px", border: "none", borderRadius: 5, background: ui.accent, color: ui.accentText, fontSize: 12, cursor: saving ? "default" : "pointer" }}
+        style={{
+          padding: "7px 18px",
+          border: "none",
+          borderRadius: 6,
+          background: ui.accent,
+          color: ui.accentText,
+          fontSize: 12.5,
+          fontWeight: 600,
+          cursor: saving ? "default" : "pointer",
+          fontFamily: "inherit",
+        }}
       >
         {saving ? "保存中…" : "保存文案"}
       </button>
@@ -564,63 +713,521 @@ function CopyStep({
   );
 }
 
-/** 单帧的展示块 */
+/** 单帧的展示块：内容 / 编辑表单 二选一显示，配 AI 重写反馈框。 */
 function FrameBlock({
-  name, label, children, ui, busy, editing, onEdit, onCancel, onPatch, onRegenerate,
+  name,
+  label,
+  children,
+  editor,
+  ui,
+  busy,
+  editing,
+  onEdit,
+  onCancel,
+  onRegenerate,
 }: {
-  name: FrameName; label: string; children: React.ReactNode; ui: JobPanelPalette;
-  busy: boolean; editing: boolean; onEdit: () => void; onCancel: () => void;
-  onPatch: (frame: FrameName, patch: Record<string, unknown>) => void;
+  name: FrameName;
+  label: string;
+  children: React.ReactNode;
+  editor: React.ReactNode;
+  ui: JobPanelPalette;
+  busy: boolean;
+  editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
   onRegenerate: (frame: FrameName, feedback?: string) => void;
 }) {
+  const [showRewrite, setShowRewrite] = useState(false);
   const [feedback, setFeedback] = useState("");
+
   const btnStyle: React.CSSProperties = {
-    border: `1px solid ${ui.border}`, background: "transparent", color: ui.sub,
-    padding: "2px 8px", borderRadius: 4, fontSize: 11, cursor: busy ? "default" : "pointer", fontFamily: "inherit",
+    border: "1px solid #ddd",
+    background: "#fff",
+    color: "#555",
+    padding: "3px 10px",
+    borderRadius: 5,
+    fontSize: 11.5,
+    cursor: busy ? "default" : "pointer",
+    fontFamily: "inherit",
+  };
+  const primaryBtnStyle: React.CSSProperties = {
+    ...btnStyle,
+    background: "#0f2a24",
+    color: "#fff",
+    border: "none",
   };
 
   return (
     <div
       style={{
         marginTop: 8,
-        padding: "10px 12px",
         borderRadius: 8,
         background: "#fff",
-        border: "1px solid #ececec",
+        border: `1px solid ${editing ? "#0f2a24" : "#ececec"}`,
+        overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 11, color: ui.sub, fontWeight: 600 }}>{label}</span>
-        <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-          {editing ? (
-            <>
-              <input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="重写要求（可选）" style={{ width: 100, fontSize: 11, padding: "2px 5px", border: `1px solid ${ui.border}`, borderRadius: 4, background: "transparent", color: ui.text, fontFamily: "inherit" }} />
-              <button disabled={busy} style={btnStyle} onClick={() => onRegenerate(name, feedback.trim() || undefined)}>{busy ? "…" : "AI 重写"}</button>
-              <button style={btnStyle} onClick={onCancel}>取消</button>
-            </>
-          ) : (
-            <button disabled={busy} style={btnStyle} onClick={onEdit}>编辑/重写</button>
-          )}
-        </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 12px",
+          background: "#faf9f7",
+          borderBottom: "1px solid #ececec",
+        }}
+      >
+        <span style={{ fontSize: 11.5, color: "#888", fontWeight: 700, letterSpacing: 0.5 }}>
+          {label}
+        </span>
+        {!editing ? (
+          <div style={{ display: "flex", gap: 6 }}>
+            <button disabled={busy} style={btnStyle} onClick={onEdit}>
+              ✎ 编辑
+            </button>
+            <button
+              disabled={busy}
+              style={btnStyle}
+              onClick={() => setShowRewrite(!showRewrite)}
+            >
+              ✨ AI 重写
+            </button>
+          </div>
+        ) : null}
       </div>
-      <div style={{ lineHeight: 1.6 }}>{editing ? <FrameEditor name={name} onPatch={onPatch} /> : children}</div>
+
+      <div style={{ padding: "12px 14px" }}>
+        {editing ? (
+          <div>{editor}</div>
+        ) : (
+          <>
+            <div style={{ lineHeight: 1.7 }}>{children}</div>
+            {showRewrite ? (
+              <div
+                style={{
+                  marginTop: 10,
+                  paddingTop: 10,
+                  borderTop: "1px dashed #e0dedb",
+                  display: "flex",
+                  gap: 6,
+                }}
+              >
+                <input
+                  autoFocus
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="给 AI 的要求（可留空，直接重写）"
+                  style={{
+                    flex: 1,
+                    fontSize: 12,
+                    padding: "5px 8px",
+                    border: "1px solid #ddd",
+                    borderRadius: 5,
+                    fontFamily: "inherit",
+                    outline: "none",
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onRegenerate(name, feedback.trim() || undefined);
+                      setShowRewrite(false);
+                      setFeedback("");
+                    }
+                  }}
+                />
+                <button
+                  disabled={busy}
+                  style={primaryBtnStyle}
+                  onClick={() => {
+                    onRegenerate(name, feedback.trim() || undefined);
+                    setShowRewrite(false);
+                    setFeedback("");
+                  }}
+                >
+                  {busy ? "生成中…" : "确认重写"}
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {editing ? (
+        <div
+          style={{
+            padding: "8px 14px",
+            background: "#faf9f7",
+            borderTop: "1px solid #ececec",
+          }}
+        >
+          <button style={btnStyle} onClick={onCancel}>
+            取消
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function FrameEditor({ name, onPatch }: { name: FrameName; onPatch: (frame: FrameName, patch: Record<string, unknown>) => void }) {
-  const [text, setText] = useState("");
-  const placeholders: Record<FrameName, string> = {
-    hook: '{"lines": ["第一行", "第二行"], "highlight": "第一行"}',
-    quote: '{"text": "原文金句", "chapter": "章节"}',
-    breakdown: '{"points": [{"text": "结论", "evidence": "原文片段或null"}]}',
-    my_take: '{"text": "你的观点"}',
-    outro: '{"question": "抛给观众的问题"}',
-  };
+// ============================================================
+// 各帧专属编辑表单
+// ============================================================
+
+/** 字数计数标签，超限变红。 */
+function CountLabel({ text, max, ui }: { text: string; max: number; ui: JobPanelPalette }) {
+  const over = text.length > max;
+  return (
+    <span style={{ fontSize: 11, color: over ? "#e85b4f" : ui.sub }}>
+      {text.length}/{max}
+    </span>
+  );
+}
+
+const fieldLabel: React.CSSProperties = {
+  fontSize: 11,
+  color: "#999",
+  fontWeight: 600,
+  display: "flex",
+  justifyContent: "space-between",
+  marginBottom: 4,
+};
+
+const textInput: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "7px 10px",
+  fontSize: 13.5,
+  borderRadius: 6,
+  border: "1px solid #ddd",
+  fontFamily: "inherit",
+  outline: "none",
+};
+
+/** 保存/取消区的保存按钮，统一样式。 */
+function SaveButton({ onClick, ui }: { onClick: () => void; ui: JobPanelPalette }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        marginTop: 4,
+        padding: "6px 16px",
+        border: "none",
+        borderRadius: 6,
+        background: ui.accent,
+        color: ui.accentText,
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      保存修改
+    </button>
+  );
+}
+
+function HookEditor({
+  data,
+  onSubmit,
+  ui,
+}: {
+  data: { lines: string[]; highlight: string | null };
+  onSubmit: (patch: Record<string, unknown>) => void;
+  ui: JobPanelPalette;
+}) {
+  const [lines, setLines] = useState<string[]>(data.lines.length ? data.lines : [""]);
+  const [highlightIdx, setHighlightIdx] = useState(
+    data.highlight ? data.lines.indexOf(data.highlight) : -1,
+  );
+
   return (
     <div>
-      <textarea autoFocus rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholders[name]} style={{ width: "100%", boxSizing: "border-box", fontSize: 12, fontFamily: "monospace", padding: "6px", borderRadius: 4, border: "1px solid #ccc", resize: "vertical" }} />
-      <button onClick={() => { try { onPatch(name, JSON.parse(text)); } catch { alert("JSON 格式错误"); } }} style={{ marginTop: 4, padding: "3px 10px", fontSize: 12, border: "none", background: "#0f2a24", color: "#fff", borderRadius: 4, cursor: "pointer" }}>提交修改</button>
+      <div style={fieldLabel}>
+        <span>钩子文字（最多 2 行，压屏大字）</span>
+      </div>
+      {lines.map((line, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+          <button
+            onClick={() => setHighlightIdx(highlightIdx === i ? -1 : i)}
+            title="设为高亮行"
+            style={{
+              width: 26,
+              height: 26,
+              flexShrink: 0,
+              borderRadius: 5,
+              border: `1px solid ${highlightIdx === i ? "#e8b84b" : "#ddd"}`,
+              background: highlightIdx === i ? "#e8b84b" : "#fff",
+              color: highlightIdx === i ? "#fff" : "#ccc",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            ★
+          </button>
+          <input
+            value={line}
+            onChange={(e) => {
+              const next = [...lines];
+              next[i] = e.target.value;
+              setLines(next);
+            }}
+            style={{ ...textInput, flex: 1 }}
+          />
+          {lines.length > 1 ? (
+            <button
+              onClick={() => {
+                setLines(lines.filter((_, j) => j !== i));
+                if (highlightIdx === i) setHighlightIdx(-1);
+              }}
+              style={{ border: "none", background: "transparent", color: "#bbb", cursor: "pointer", fontSize: 14 }}
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
+      ))}
+      {lines.length < 2 ? (
+        <button
+          onClick={() => setLines([...lines, ""])}
+          style={{ fontSize: 11.5, color: ui.sub, background: "transparent", border: "1px dashed #ddd", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}
+        >
+          + 加一行
+        </button>
+      ) : null}
+      <p style={{ fontSize: 11, color: "#bbb", marginTop: 8 }}>点 ★ 标记要强调的那一行（会变琥珀色）</p>
+      <SaveButton
+        ui={ui}
+        onClick={() =>
+          onSubmit({
+            lines: lines.filter((l) => l.trim()),
+            highlight: highlightIdx >= 0 ? lines[highlightIdx] : null,
+          })
+        }
+      />
+    </div>
+  );
+}
+
+function QuoteEditor({
+  data,
+  onSubmit,
+  ui,
+}: {
+  data: { text: string; chapter: string | null };
+  onSubmit: (patch: Record<string, unknown>) => void;
+  ui: JobPanelPalette;
+}) {
+  const [text, setText] = useState(data.text);
+  const [chapter, setChapter] = useState(data.chapter ?? "");
+
+  return (
+    <div>
+      <div style={fieldLabel}>
+        <span>原文金句</span>
+        <CountLabel text={text} max={120} ui={ui} />
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={3}
+        style={{ ...textInput, resize: "vertical", marginBottom: 10 }}
+      />
+      <div style={fieldLabel}>
+        <span>章节（可选）</span>
+      </div>
+      <input value={chapter} onChange={(e) => setChapter(e.target.value)} style={{ ...textInput, marginBottom: 10 }} />
+      <SaveButton ui={ui} onClick={() => onSubmit({ text, chapter: chapter || null })} />
+    </div>
+  );
+}
+
+function BreakdownEditor({
+  data,
+  onSubmit,
+  ui,
+}: {
+  data: { kicker: string; points: { text: string; evidence: string | null }[] };
+  onSubmit: (patch: Record<string, unknown>) => void;
+  ui: JobPanelPalette;
+}) {
+  const [kicker, setKicker] = useState(data.kicker);
+  const [points, setPoints] = useState(data.points.map((p) => ({ ...p })));
+
+  const update = (i: number, field: "text" | "evidence", value: string) => {
+    const next = [...points];
+    next[i] = { ...next[i], [field]: field === "evidence" && !value ? null : value };
+    setPoints(next);
+  };
+
+  return (
+    <div>
+      <div style={fieldLabel}>
+        <span>小标题</span>
+        <CountLabel text={kicker} max={20} ui={ui} />
+      </div>
+      <input value={kicker} onChange={(e) => setKicker(e.target.value)} style={{ ...textInput, marginBottom: 12 }} />
+
+      {points.map((p, i) => (
+        <div
+          key={i}
+          style={{
+            marginBottom: 10,
+            padding: "10px 12px",
+            background: "#f8f7f5",
+            borderRadius: 6,
+            border: "1px solid #ececec",
+          }}
+        >
+          <div style={fieldLabel}>
+            <span>要点 {i + 1}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <CountLabel text={p.text} max={24} ui={ui} />
+              {points.length > 2 ? (
+                <button
+                  onClick={() => setPoints(points.filter((_, j) => j !== i))}
+                  style={{ border: "none", background: "transparent", color: "#bbb", cursor: "pointer", fontSize: 13 }}
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <input
+            value={p.text}
+            onChange={(e) => update(i, "text", e.target.value)}
+            style={{ ...textInput, marginBottom: 6 }}
+          />
+          <div style={{ ...fieldLabel, marginTop: 4 }}>
+            <span>原文依据（找不到就留空，不要编）</span>
+            <CountLabel text={p.evidence ?? ""} max={80} ui={ui} />
+          </div>
+          <input
+            value={p.evidence ?? ""}
+            onChange={(e) => update(i, "evidence", e.target.value)}
+            placeholder="留空 = 无原文依据"
+            style={{ ...textInput, fontStyle: p.evidence ? "normal" : "italic" }}
+          />
+        </div>
+      ))}
+
+      {points.length < 3 ? (
+        <button
+          onClick={() => setPoints([...points, { text: "", evidence: null }])}
+          style={{ fontSize: 11.5, color: ui.sub, background: "transparent", border: "1px dashed #ddd", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}
+        >
+          + 加一条要点（最多 3 条）
+        </button>
+      ) : null}
+
+      <p style={{ fontSize: 11, color: "#bbb", margin: "4px 0 8px" }}>
+        原文依据会校验是否真的出现在划线原文里，不是原文子串的会被自动清空。
+      </p>
+      <SaveButton
+        ui={ui}
+        onClick={() =>
+          onSubmit({
+            kicker,
+            points: points.filter((p) => p.text.trim()),
+          })
+        }
+      />
+    </div>
+  );
+}
+
+function MyTakeEditor({
+  data,
+  onSubmit,
+  ui,
+}: {
+  data: { kicker: string; text: string };
+  onSubmit: (patch: Record<string, unknown>) => void;
+  ui: JobPanelPalette;
+}) {
+  const [kicker, setKicker] = useState(data.kicker);
+  const [text, setText] = useState(data.text);
+
+  return (
+    <div>
+      <div style={fieldLabel}>
+        <span>小标题</span>
+        <CountLabel text={kicker} max={20} ui={ui} />
+      </div>
+      <input value={kicker} onChange={(e) => setKicker(e.target.value)} style={{ ...textInput, marginBottom: 10 }} />
+      <div style={fieldLabel}>
+        <span>我的想法（屏幕显示的文字）</span>
+        <CountLabel text={text} max={200} ui={ui} />
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={4}
+        style={{ ...textInput, resize: "vertical", marginBottom: 10 }}
+      />
+      <SaveButton ui={ui} onClick={() => onSubmit({ kicker, text })} />
+    </div>
+  );
+}
+
+function OutroEditor({
+  data,
+  onSubmit,
+  ui,
+}: {
+  data: { question: string; footer_lines: string[] };
+  onSubmit: (patch: Record<string, unknown>) => void;
+  ui: JobPanelPalette;
+}) {
+  const [question, setQuestion] = useState(data.question);
+  const [lines, setLines] = useState(data.footer_lines.length ? data.footer_lines : [""]);
+
+  return (
+    <div>
+      <div style={fieldLabel}>
+        <span>抛给观众的问题</span>
+        <CountLabel text={question} max={40} ui={ui} />
+      </div>
+      <input value={question} onChange={(e) => setQuestion(e.target.value)} style={{ ...textInput, marginBottom: 12 }} />
+
+      <div style={fieldLabel}>
+        <span>落款（最多 3 行）</span>
+      </div>
+      {lines.map((line, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+          <input
+            value={line}
+            onChange={(e) => {
+              const next = [...lines];
+              next[i] = e.target.value;
+              setLines(next);
+            }}
+            style={{ ...textInput, flex: 1 }}
+          />
+          {lines.length > 1 ? (
+            <button
+              onClick={() => setLines(lines.filter((_, j) => j !== i))}
+              style={{ border: "none", background: "transparent", color: "#bbb", cursor: "pointer", fontSize: 14 }}
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
+      ))}
+      {lines.length < 3 ? (
+        <button
+          onClick={() => setLines([...lines, ""])}
+          style={{ fontSize: 11.5, color: ui.sub, background: "transparent", border: "1px dashed #ddd", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}
+        >
+          + 加一行
+        </button>
+      ) : null}
+      <div>
+        <SaveButton
+          ui={ui}
+          onClick={() =>
+            onSubmit({ question, footer_lines: lines.filter((l) => l.trim()) })
+          }
+        />
+      </div>
     </div>
   );
 }
