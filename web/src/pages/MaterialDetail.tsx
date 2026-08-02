@@ -17,7 +17,6 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 编辑表单状态
   const [sourceText, setSourceText] = useState("");
   const [myTake, setMyTake] = useState("");
   const [chapter, setChapter] = useState("");
@@ -43,6 +42,19 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
     load();
   }, [materialId]);
 
+  // 轮询：任务在跑时自动刷新
+  useEffect(() => {
+    if (!job) return;
+    const stopped = ["done", "failed", "script_pending", "render_pending", "copy_pending", "tts_pending", "cover_pending"];
+    if (stopped.includes(job.status)) return;
+    const timer = setTimeout(async () => {
+      try {
+        setJob(await getJob(job.id));
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [job]);
+
   const onSaveMaterial = async () => {
     setBusy(true);
     try {
@@ -52,7 +64,7 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
         chapter: chapter || null,
       });
       setEditing(false);
-      await load(); // 重新加载，会拿到新的 job 状态
+      await load();
     } catch (e) {
       alert(String(e));
     } finally {
@@ -61,20 +73,10 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
   };
 
   const onCreateJob = async () => {
-    if (!material) return;
     setBusy(true);
     try {
       const newJob = await createJob(materialId);
       setJob(newJob);
-      // 开始轮询
-      const poll = async () => {
-        const updated = await getJob(newJob.id);
-        setJob(updated);
-        if (updated.status !== "done" && updated.status !== "failed" && !updated.status.endsWith("_pending")) {
-          setTimeout(poll, 2000);
-        }
-      };
-      setTimeout(poll, 2000);
     } catch (e) {
       alert(String(e));
     } finally {
@@ -83,168 +85,229 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
   };
 
   if (error) return <div style={{ padding: 40, color: "#c44" }}>{error}</div>;
-  if (!material) return <div style={{ padding: 40, color: "#999" }}>加载中…</div>;
+  if (!material) return <div style={{ padding: 40, color: "#999", textAlign: "center" }}>加载中…</div>;
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "10px 12px",
+    fontSize: 14,
+    borderRadius: 8,
+    border: "1px solid #e0dedb",
+    background: "#fff",
+    fontFamily: "inherit",
+    outline: "none",
+    transition: "border-color 0.15s",
+  };
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 20px 60px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <Link to="/materials" style={{ fontSize: 14, color: "#666", textDecoration: "none" }}>
+    <div style={{ minHeight: "100vh", background: "#f8f7f5" }}>
+      {/* 顶栏 */}
+      <header
+        style={{
+          background: "#fff",
+          borderBottom: "1px solid #ececec",
+          padding: "14px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Link to="/materials" style={{ fontSize: 14, color: "#999", textDecoration: "none" }}>
           ← 素材管理
         </Link>
         {material.book_id ? (
-          <Link to={`/read/${material.book_id}`} style={{ fontSize: 13, color: "#666", textDecoration: "none" }}>
+          <Link
+            to={`/read/${material.book_id}`}
+            style={{ fontSize: 13, color: "#666", textDecoration: "none" }}
+          >
             在阅读器中打开 →
           </Link>
         ) : null}
-      </div>
+      </header>
 
-      {/* 素材内容区 */}
-      <div
-        style={{
-          padding: "18px 20px",
-          borderRadius: 10,
-          border: "1px solid #eee",
-          background: "#fff",
-          marginBottom: 20,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{material.book_title ?? "无书名"}</span>
-            {material.book_author ? (
-              <span style={{ fontSize: 12, color: "#999", marginLeft: 8 }}>{material.book_author}</span>
-            ) : null}
-          </div>
-          <button
-            onClick={() => setEditing(!editing)}
+      <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 20px 60px" }}>
+        {/* 素材卡片 */}
+        <div
+          style={{
+            padding: "20px 22px",
+            borderRadius: 14,
+            background: "#fff",
+            border: "1px solid #ececec",
+            marginBottom: 20,
+          }}
+        >
+          {/* 书名行 */}
+          <div
             style={{
-              border: "1px solid #ddd",
-              background: "transparent",
-              color: "#666",
-              padding: "4px 12px",
-              borderRadius: 5,
-              fontSize: 12,
-              cursor: "pointer",
-              fontFamily: "inherit",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 14,
             }}
           >
-            {editing ? "取消" : "编辑素材"}
-          </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ width: 3, height: 18, borderRadius: 2, background: "#0f2a24" }} />
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{material.book_title ?? "手动粘贴"}</span>
+              {material.book_author ? (
+                <span style={{ fontSize: 12, color: "#aaa" }}>{material.book_author}</span>
+              ) : null}
+            </div>
+            <button
+              onClick={() => setEditing(!editing)}
+              style={{
+                border: "1px solid #e0dedb",
+                background: "transparent",
+                color: "#666",
+                padding: "5px 14px",
+                borderRadius: 6,
+                fontSize: 12,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "all 0.15s",
+              }}
+            >
+              {editing ? "取消" : "✎ 编辑"}
+            </button>
+          </div>
+
+          {editing ? (
+            <div>
+              <label style={{ fontSize: 11, color: "#999", display: "block", marginBottom: 5, fontWeight: 600 }}>
+                划线原文
+              </label>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                rows={4}
+                style={{ ...inputStyle, resize: "vertical", marginBottom: 12 }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0f2a24")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#e0dedb")}
+              />
+              <label style={{ fontSize: 11, color: "#999", display: "block", marginBottom: 5, fontWeight: 600 }}>
+                我的想法
+              </label>
+              <textarea
+                value={myTake}
+                onChange={(e) => setMyTake(e.target.value)}
+                rows={4}
+                style={{ ...inputStyle, resize: "vertical", marginBottom: 12 }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0f2a24")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#e0dedb")}
+              />
+              <label style={{ fontSize: 11, color: "#999", display: "block", marginBottom: 5, fontWeight: 600 }}>
+                章节
+              </label>
+              <input
+                value={chapter}
+                onChange={(e) => setChapter(e.target.value)}
+                style={{ ...inputStyle, marginBottom: 14 }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0f2a24")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#e0dedb")}
+              />
+              <p style={{ fontSize: 11, color: "#bbb", marginBottom: 12 }}>
+                保存后任务退回「AI 写脚本」重跑，旧视频保留为历史版本。
+              </p>
+              <button
+                onClick={onSaveMaterial}
+                disabled={busy}
+                style={{
+                  padding: "9px 24px",
+                  border: "none",
+                  borderRadius: 8,
+                  background: "#0f2a24",
+                  color: "#fff",
+                  fontSize: 14,
+                  cursor: busy ? "default" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {busy ? "保存中…" : "保存并重跑"}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div
+                style={{
+                  padding: "12px 14px",
+                  background: "#f8f7f5",
+                  borderRadius: 8,
+                  marginBottom: 10,
+                  borderLeft: "3px solid #e8b84b",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: "#333" }}>
+                  {material.source_text}
+                </p>
+              </div>
+              {material.my_take ? (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    background: "#f0f9f5",
+                    borderRadius: 8,
+                    borderLeft: "3px solid #10b981",
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.75, color: "#0f7050" }}>
+                    💬 {material.my_take}
+                  </p>
+                </div>
+              ) : null}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  marginTop: 12,
+                  fontSize: 11,
+                  color: "#bbb",
+                }}
+              >
+                <span>{material.chapter ?? ""}</span>
+                {material.progress !== null ? <span>进度 {material.progress}%</span> : null}
+                <span>{material.mode === "deep" ? "深耕档" : "快产档"}</span>
+                <span>
+                  {new Date(material.created_at).toLocaleDateString("zh-CN", { month: "long", day: "numeric" })}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {editing ? (
-          <div>
-            <label style={{ fontSize: 11, color: "#999", display: "block", marginBottom: 4 }}>划线原文</label>
-            <textarea
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              rows={4}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "8px 10px",
-                fontSize: 14,
-                borderRadius: 6,
-                border: "1px solid #ddd",
-                resize: "vertical",
-                fontFamily: "inherit",
-                marginBottom: 10,
-              }}
-            />
-            <label style={{ fontSize: 11, color: "#999", display: "block", marginBottom: 4 }}>我的想法</label>
-            <textarea
-              value={myTake}
-              onChange={(e) => setMyTake(e.target.value)}
-              rows={4}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "8px 10px",
-                fontSize: 14,
-                borderRadius: 6,
-                border: "1px solid #ddd",
-                resize: "vertical",
-                fontFamily: "inherit",
-                marginBottom: 10,
-              }}
-            />
-            <label style={{ fontSize: 11, color: "#999", display: "block", marginBottom: 4 }}>章节</label>
-            <input
-              value={chapter}
-              onChange={(e) => setChapter(e.target.value)}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "8px 10px",
-                fontSize: 14,
-                borderRadius: 6,
-                border: "1px solid #ddd",
-                fontFamily: "inherit",
-                marginBottom: 12,
-              }}
-            />
-            <p style={{ fontSize: 11, color: "#999", marginBottom: 10 }}>
-              保存后任务会退回「AI 写脚本」重跑，旧视频保留为历史版本。
-            </p>
+        {/* 五环节面板 */}
+        {job ? (
+          <JobPanel job={job} setJob={setJob} />
+        ) : (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              borderRadius: 14,
+              background: "#fff",
+              border: "1px solid #ececec",
+            }}
+          >
+            <p style={{ fontSize: 36, margin: "0 0 8px" }}>🎬</p>
+            <p style={{ color: "#999", fontSize: 14, marginBottom: 16 }}>这个素材还没出过视频</p>
             <button
-              onClick={onSaveMaterial}
+              onClick={onCreateJob}
               disabled={busy}
               style={{
-                padding: "8px 20px",
+                padding: "10px 28px",
                 border: "none",
-                borderRadius: 6,
+                borderRadius: 8,
                 background: "#0f2a24",
                 color: "#fff",
-                fontSize: 14,
+                fontSize: 15,
                 cursor: busy ? "default" : "pointer",
                 fontFamily: "inherit",
               }}
             >
-              {busy ? "保存中…" : "保存并重跑"}
+              {busy ? "创建中…" : "生成视频"}
             </button>
-          </div>
-        ) : (
-          <div>
-            <p style={{ margin: "0 0 8px", fontSize: 14, lineHeight: 1.7, color: "#333" }}>
-              {material.source_text}
-            </p>
-            {material.my_take ? (
-              <p style={{ margin: "0 0 8px", fontSize: 13, lineHeight: 1.7, color: "#0f7050" }}>
-                {material.my_take}
-              </p>
-            ) : null}
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#999" }}>
-              {material.chapter ?? ""} {material.progress !== null ? `· ${material.progress}%` : ""}
-              {` · ${material.mode === "deep" ? "深耕档" : "快产档"}`}
-            </p>
           </div>
         )}
       </div>
-
-      {/* 任务五环节面板 */}
-      {job ? (
-        <JobPanel job={job} setJob={setJob} />
-      ) : (
-        <div style={{ textAlign: "center", padding: "30px 0" }}>
-          <p style={{ color: "#999", fontSize: 14, marginBottom: 16 }}>这个素材还没出过视频</p>
-          <button
-            onClick={onCreateJob}
-            disabled={busy}
-            style={{
-              padding: "10px 28px",
-              border: "none",
-              borderRadius: 8,
-              background: "#0f2a24",
-              color: "#fff",
-              fontSize: 15,
-              cursor: busy ? "default" : "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            {busy ? "创建中…" : "生成视频"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
