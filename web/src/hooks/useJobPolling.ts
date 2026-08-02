@@ -5,7 +5,7 @@ import { getJob, type JobOut } from "../api";
 function isRunning(status: JobOut["status"]): boolean {
   // _pending 状态不需要轮询：任务停着等用户操作，轮询只是白白打后端。
   // 用户 resume 后手动 setJob 触发重新轮询。
-  const stopped = new Set(["done", "failed", "script_pending", "tts_pending", "render_pending", "cover_pending"]);
+  const stopped = new Set(["done", "failed", "script_pending", "tts_pending", "render_pending", "cover_pending", "copy_pending"]);
   return !stopped.has(status);
 }
 

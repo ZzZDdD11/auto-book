@@ -25,6 +25,7 @@ export type JobStatus =
   | "render_pending"
   | "cover_pending"
   | "copywriting"
+  | "copy_pending"
   | "done"
   | "failed";
 
@@ -228,6 +229,12 @@ export const regenerateFrame = (
   frame: FrameName,
   feedback?: string,
 ) => post<JobOut>(`/api/jobs/${jobId}/regenerate-frame`, { frame, feedback });
+
+/** 改文案。整体替换，改完停在 copy_pending。 */
+export const patchCopy = (
+  jobId: number,
+  copies: Record<string, CopyVariant>,
+) => patch<JobOut>(`/api/jobs/${jobId}/copy`, { copies });
 
 /** 从 _pending 放行，auto_advance 恢复 true，继续往下跑。 */
 export const resumeJob = (jobId: number) => post<JobOut>(`/api/jobs/${jobId}/resume`, {});

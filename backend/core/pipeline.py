@@ -342,12 +342,18 @@ async def run_job(
             if not job.auto_advance:
                 return
 
-        # render_pending → copywriting → done
+        # render_pending → copywriting → copy_pending → done
         if job.status in (JobStatus.render_pending, JobStatus.copywriting):
             _touch(session, job, JobStatus.copywriting)
             await run_copywriting(
                 job, session, client=client, generate_copy=generate_copy
             )
+            _touch(session, job, JobStatus.copy_pending)
+            if not job.auto_advance:
+                return
+
+        # copy_pending → done
+        if job.status in (JobStatus.copy_pending,):
             _touch(session, job, JobStatus.done)
 
     except Exception as exc:

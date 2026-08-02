@@ -43,6 +43,16 @@ class RegenerateIn(BaseModel):
     feedback: str | None = None
 
 
+class CopyPatch(BaseModel):
+    """文案编辑请求体。copies 的结构与 CopyPayload 一致。
+
+    前端直接编辑 JSON 太难用，所以这里接受完整替换 ——
+    前端展示三平台文案，用户改完后整体提交。
+    """
+
+    copies: dict[str, dict[str, Any]]
+
+
 class JobOut(BaseModel):
     id: int
     status: str
@@ -320,4 +330,28 @@ async def resume(
     session.refresh(job)
 
     background.add_task(_run_in_background, job.id)
+    return _to_out(job, session)
+
+
+@router.patch("/{job_id}/copy", response_model=JobOut)
+async def patch_copy(
+    job_id: int,
+    payload: CopyPatch,
+    session: SessionDep,
+) -> JobOut:
+    """改文案。改完停在 copy_pending，等用户 resume。
+
+    文案和视频是独立产物，改文案不需要重新渲染。
+    """
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not job.copy_json:
+        raise HTTPException(status_code=409, detail="文案还没生成")
+
+    job.copy_json = json.dumps(payload.copies, ensure_ascii=False)
+    job.auto_advance = False
+    session.add(job)
+    session.commit()
+    session.refresh(job)
     return _to_out(job, session)

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import {
   listHistory,
+  patchCopy,
   patchScriptFrame,
   regenerateFrame,
   resumeJob,
   videoUrl,
+  type CopyVariant,
   type FrameName,
   type HistoryEntry,
   type JobOut,
@@ -22,6 +24,7 @@ export const STATUS_LABEL: Record<JobStatus, string> = {
   render_pending: "视频待审",
   cover_pending: "封面待审",
   copywriting: "写发布文案",
+  copy_pending: "文案待审",
   done: "完成",
   failed: "失败",
 };
@@ -159,7 +162,7 @@ export function JobPanel({
       ) : null}
 
       {/* 待审状态：显示脚本内容 + 编辑/重写/继续 */}
-      {isPending && job.script ? (
+      {isPending && job.script && job.status === "script_pending" ? (
         <ReviewPanel
           script={job.script}
           ui={c}
@@ -169,6 +172,46 @@ export function JobPanel({
           onCancelEdit={() => setEditingFrame(null)}
           onPatchFrame={onPatchFrame}
           onRegenerate={onRegenerate}
+        />
+      ) : null}
+
+      {/* render_pending：视频已渲完，先看再决定改不改 */}
+      {job.status === "render_pending" && job.video_version ? (
+        <div style={{ marginTop: 14 }}>
+          <video
+            src={videoUrl(job.id, job.video_version)}
+            controls
+            style={{
+              width: "100%",
+              maxWidth: 320,
+              borderRadius: 8,
+              display: "block",
+              margin: "0 auto",
+            }}
+          />
+          {job.script ? (
+            <ReviewPanel
+              script={job.script}
+              ui={c}
+              busy={busy}
+              editingFrame={editingFrame}
+              onEditFrame={(f) => setEditingFrame(f)}
+              onCancelEdit={() => setEditingFrame(null)}
+              onPatchFrame={onPatchFrame}
+              onRegenerate={onRegenerate}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* copy_pending：文案已生成，可看可改 */}
+      {job.status === "copy_pending" && job.copies ? (
+        <CopyReviewPanel
+          jobId={job.id}
+          copies={job.copies}
+          ui={c}
+          busy={busy}
+          setJob={setJob}
         />
       ) : null}
 
@@ -581,6 +624,121 @@ function FrameEditor({
         }}
       >
         提交修改
+      </button>
+    </div>
+  );
+}
+
+/** 文案审改面板：三平台文案，每条可编辑标题/正文/标签。 */
+function CopyReviewPanel({
+  jobId,
+  copies,
+  ui,
+  busy,
+  setJob,
+}: {
+  jobId: number;
+  copies: Record<string, CopyVariant>;
+  ui: JobPanelPalette;
+  busy: boolean;
+  setJob: (j: JobOut | null) => void;
+}) {
+  const [edited, setEdited] = useState<Record<string, CopyVariant>>(copies);
+  const [saving, setSaving] = useState(false);
+
+  const platforms = Object.keys(edited);
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "6px 8px",
+    fontSize: 13,
+    borderRadius: 5,
+    border: `1px solid ${ui.border}`,
+    background: "transparent",
+    color: ui.text,
+    fontFamily: "inherit",
+    outline: "none",
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: 14,
+        background: ui.panelAlt,
+        borderRadius: 8,
+      }}
+    >
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: ui.sub }}>
+        文案已生成。改完点「保存文案」，然后点「确认，继续」完成。
+      </p>
+      {platforms.map((platform) => {
+        const v = edited[platform];
+        return (
+          <div key={platform} style={{ marginBottom: 16 }}>
+            <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>{platform}</h3>
+            <input
+              value={v.title}
+              onChange={(e) =>
+                setEdited({ ...edited, [platform]: { ...v, title: e.target.value } })
+              }
+              placeholder="标题"
+              style={{ ...inputStyle, marginBottom: 6, fontWeight: 600 }}
+            />
+            <textarea
+              value={v.body}
+              onChange={(e) =>
+                setEdited({ ...edited, [platform]: { ...v, body: e.target.value } })
+              }
+              rows={4}
+              placeholder="正文"
+              style={{ ...inputStyle, marginBottom: 6, resize: "vertical" }}
+            />
+            <input
+              value={v.tags.join(" ")}
+              onChange={(e) =>
+                setEdited({
+                  ...edited,
+                  [platform]: {
+                    ...v,
+                    tags: e.target.value
+                      .split(/\s+/)
+                      .map((t) => t.replace(/^#/, ""))
+                      .filter(Boolean),
+                  },
+                })
+              }
+              placeholder="#标签 用空格分隔"
+              style={{ ...inputStyle, fontSize: 12, color: ui.sub }}
+            />
+          </div>
+        );
+      })}
+      <button
+        onClick={async () => {
+          setSaving(true);
+          try {
+            const updated = await patchCopy(jobId, edited);
+            setJob(updated);
+          } catch (e) {
+            alert(String(e));
+          } finally {
+            setSaving(false);
+          }
+        }}
+        disabled={saving || busy}
+        style={{
+          padding: "7px 16px",
+          border: "none",
+          borderRadius: 6,
+          background: ui.accent,
+          color: ui.accentText,
+          fontSize: 13,
+          cursor: saving ? "default" : "pointer",
+        }}
+      >
+        {saving ? "保存中…" : "保存文案"}
       </button>
     </div>
   );
