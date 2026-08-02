@@ -32,10 +32,16 @@ class MaterialMode(str, Enum):
 
 
 class JobStatus(str, Enum):
+    # 流水线阶段：每个完成后进对应的 _pending，等 auto_advance 或 resume
     pending = "pending"
     scripting = "scripting"
+    script_pending = "script_pending"
     tts = "tts"
+    tts_pending = "tts_pending"
     rendering = "rendering"
+    render_pending = "render_pending"
+    cover_pending = "cover_pending"
+    copywriting = "copywriting"
     done = "done"
     failed = "failed"
 
@@ -81,9 +87,14 @@ class Job(SQLModel, table=True):
     material_id: int = Field(foreign_key="material.id", index=True)
     status: JobStatus = Field(default=JobStatus.pending, index=True)
     script_json: str | None = None
+    # AI 重写单帧时，旧版整份 script_json 追加到这里，可回滚
+    script_json_history: str | None = None
     copy_json: str | None = None
     error: str | None = None
     cost_tokens: int = 0
+    # 默认 true：阶段完成后自动进下一阶段（保持「随手记、自动出片」体验）。
+    # 任何编辑操作把它关掉，停在当前 _pending 等用户 resume。
+    auto_advance: bool = True
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -91,6 +102,8 @@ class Job(SQLModel, table=True):
 class Asset(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="job.id", index=True)
-    kind: str  # audio | video | caption
+    kind: str  # audio | video | cover:{ratio} | caption
     path: str
+    # 产物版本号。改素材重跑、单帧重做都会 +1，旧版保留为历史。
+    version: int = 1
     created_at: datetime = Field(default_factory=utcnow)

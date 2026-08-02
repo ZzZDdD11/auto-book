@@ -1,12 +1,12 @@
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
-from backend.db import get_session
-from backend.models import Book, Material, MaterialMode, MaterialSource
+from backend.db import engine, get_session
+from backend.models import Book, Job, JobStatus, Material, MaterialMode, MaterialSource
 from backend.settings import get_settings
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
@@ -100,3 +100,63 @@ def create_material(payload: MaterialIn, session: SessionDep) -> MaterialOut:
     session.commit()
     session.refresh(material)
     return MaterialOut(material_id=material.id, book_id=book.id)
+
+
+class MaterialPatch(BaseModel):
+    """素材编辑的请求体。所有字段可选，只更新提供的。"""
+
+    source_text: str | None = None
+    my_take: str | None = None
+    chapter: str | None = None
+    progress: int | None = Field(default=None, ge=0, le=100)
+
+
+async def _restart_job(job_id: int) -> None:
+    """后台重跑 job：退回 scripting，重生成脚本，一路往下。"""
+    from backend.core.pipeline import run_job
+
+    with Session(engine) as session:
+        await run_job(job_id, session)
+
+
+@router.patch("/{material_id}", response_model=dict)
+async def edit_material(
+    material_id: int,
+    payload: MaterialPatch,
+    session: SessionDep,
+    background: BackgroundTasks,
+) -> dict[str, Any]:
+    """改素材。关联的 job 退回 scripting 重跑。
+
+    旧视频保留为历史版本（version 不变，新版本 version+1）。
+    找不到关联 job 就只改素材不重跑（素材可能还没出过视频）。
+    """
+    material = session.get(Material, material_id)
+    if material is None:
+        raise HTTPException(status_code=404, detail="素材不存在")
+
+    # 只更新非 None 的字段
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(material, field, value)
+    session.add(material)
+    session.commit()
+
+    # 只重启最新的一个 job —— 改素材是为了修正「这条素材出过的最新视频」，
+    # 不是要把历史版本全部重跑（那些是过去某个时刻的快照，不该动）。
+    jobs = session.exec(
+        select(Job).where(Job.material_id == material_id).order_by(Job.created_at.desc())  # type: ignore[union-attr]
+    ).all()
+    restarted: list[int] = []
+    if jobs:
+        job = jobs[0]
+        job.script_json = None
+        job.script_json_history = None
+        job.status = JobStatus.scripting
+        job.auto_advance = True
+        job.error = None
+        session.add(job)
+        session.commit()
+        restarted.append(job.id or 0)
+        background.add_task(_restart_job, job.id or 0)
+
+    return {"material_id": material_id, "restarted_jobs": restarted}

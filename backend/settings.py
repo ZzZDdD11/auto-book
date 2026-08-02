@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     # 单张封面的渲染超时。静图比视频快得多，给 120 秒足够。
     cover_timeout_s: int = 120
 
+    # TTS 完成后是否暂停等审。默认 false —— edge-tts 能调的只有音色，
+    # 价值不大；真要听一遍再换音色时手动设 true。
+    pause_after_tts: bool = False
+
     # ---- EPUB 上传 ----
     # EPUB 是用户上传的不可信 ZIP，下面几个上限用来防 zip bomb。
     max_epub_bytes: int = 80 * 1024 * 1024

@@ -77,7 +77,10 @@ class Point(BaseModel):
     """
 
     text: Text = Field(max_length=24)
-    evidence: Text | None = Field(default=None, max_length=40)
+    # 80 字能放下一句完整的中文原文。之前定 40 太紧，实测 AI 照抄一句
+    # 50 字的原文就被 Pydantic 拒了 —— 那不是 AI 的错，是限制不合理。
+    # evidence 是原文照抄，长度由原文决定，不该让 AI 压缩（压缩=改写）。
+    evidence: Text | None = Field(default=None, max_length=80)
 
 
 class BreakdownFrame(BaseFrame):

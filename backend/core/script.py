@@ -6,12 +6,13 @@
 """
 
 from datetime import date
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
 from backend.core.deepseek import DeepSeekClient
 from backend.models import MaterialMode
-from backend.schema.frames import Script
+from backend.schema.frames import FRAME_ORDER, Script
 from backend.settings import get_settings
 
 _STRUCTURE = """你必须返回一个 JSON 对象，字段如下（不要多、不要少）：
@@ -168,6 +169,86 @@ async def generate_script(data: ScriptInput, client: DeepSeekClient) -> tuple[Sc
     )
     strip_fake_evidence(script, data.source_text)
     return script, tokens
+
+
+# ============================================================
+# 单帧重写：AI 只重生成指定帧，其他四帧冻结
+# ============================================================
+
+# 各帧的输出 schema 描述，供单帧重写的 prompt 用
+_FRAME_SCHEMA: dict[str, str] = {
+    "hook": '{"lines": ["1 到 2 行短句"], "highlight": "lines 中的某一行或 null", "narration": ""}',
+    "quote": '{"text": "原文金句", "chapter": "章节或 null", "highlighted_at": "YYYY-MM-DD", "progress": 0-100, "narration": "念出来的句子"}',
+    "breakdown": '{"kicker": "小标题", "points": [{"text": "结论", "evidence": "原文片段或 null"}], "narration": "讲解口语"}',
+    "my_take": '{"kicker": "小标题", "text": "屏幕显示的个人观点", "narration": "念出来的个人观点"}',
+    "outro": '{"question": "抛给观众的问题", "footer_lines": ["落款"], "narration": "把问题念出来"}',
+}
+
+
+def _build_frame_rewrite_prompt(
+    script: Script, target: str, feedback: str | None
+) -> str:
+    """构造单帧重写的 user prompt。
+
+    把其他四帧作为 context 喂进去，明确「只输出指定帧」。
+    """
+    others = []
+    for kind in FRAME_ORDER:
+        if kind == target:
+            continue
+        frame = getattr(script, kind)
+        others.append(f"【{kind}】{frame.model_dump_json(indent=2)}")
+
+    parts = [
+        "以下是这条视频的其他四帧内容，请保持风格与它们一致：",
+        "",
+        "\n\n".join(others),
+        "",
+        f"现在请只重新生成【{target}】这一帧。",
+        f"输出格式：{_FRAME_SCHEMA[target]}",
+        "只输出这一帧的 JSON 对象，不要输出其他帧，不要输出解释。",
+    ]
+    if feedback:
+        parts.append(f"要求：{feedback}")
+    return "\n".join(parts)
+
+
+async def regenerate_single_frame(
+    script: Script,
+    frame: str,
+    feedback: str | None,
+    client: DeepSeekClient,
+) -> tuple[Any, int]:
+    """AI 重写指定帧，返回 (新帧对象, token 数)。
+
+    其他四帧冻结 —— 喂给 AI 作为 context，prompt 明确「只输出指定帧」。
+    """
+    from backend.schema.frames import (
+        BreakdownFrame,
+        HookFrame,
+        MyTakeFrame,
+        OutroFrame,
+        QuoteFrame,
+    )
+
+    frame_classes = {
+        "hook": HookFrame,
+        "quote": QuoteFrame,
+        "breakdown": BreakdownFrame,
+        "my_take": MyTakeFrame,
+        "outro": OutroFrame,
+    }
+    cls = frame_classes.get(frame)
+    if cls is None:
+        raise ValueError(f"非法帧名：{frame!r}")
+
+    system = (
+        "你在帮一个人重写短视频脚本的某一帧。其他四帧已经定稿，"
+        "你的输出会直接替换这一帧，所以必须只输出这一帧的 JSON，不要多不要少。"
+        "保持与其他帧的风格一致，不要与其他帧的内容重复。"
+    )
+    user = _build_frame_rewrite_prompt(script, frame, feedback)
+    return await client.complete_json(system, user, cls)
 
 
 # 比对时忽略的字符：标点、空白、引号。
