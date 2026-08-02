@@ -130,6 +130,74 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
   // 主题、字号、单双页各自独立 effect，避免互相触发无谓重算。
   // effect 在 rendition 就绪后同步执行，早于首章内容加载，所以 select 不会闪屏。
 
+  // 拖动翻页：快速水平滑动翻页，慢速拖动选中文字。
+  // 不用 epub.js 的 swipeable —— 它在 touchmove 时 preventDefault，
+  // 把选区行为一起杀了。这里只在 touchend 判断：快速且水平为主的滑动才翻页，
+  // 慢速长按的交给浏览器正常选中。
+  // 桌面端也支持：鼠标快速横向拖动翻页，慢速拖动选中。
+  useEffect(() => {
+    if (!rendition) return;
+
+    const contents = rendition.getContents() as unknown as {
+      window?: Window;
+      document?: Document;
+    }[];
+    const iframeWin = contents[0]?.window;
+    if (!iframeWin) return;
+
+    let startX = 0;
+    let startY = 0;
+    let startTime = 0;
+
+    const onStart = (x: number, y: number) => {
+      startX = x;
+      startY = y;
+      startTime = Date.now();
+    };
+
+    const onEnd = (x: number, y: number) => {
+      const dx = x - startX;
+      const dy = y - startY;
+      const dt = Date.now() - startTime;
+      // 快速（< 500ms）且水平为主（水平位移 > 垂直的 1.5 倍）且超过 50px → 翻页
+      if (dt < 500 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx > 0) rendition.prev();
+        else rendition.next();
+      }
+    };
+
+    // 触摸
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) onStart(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length === 1)
+        onEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    };
+    // 鼠标（桌面端）
+    let mouseDown = false;
+    const onMouseDown = (e: MouseEvent) => {
+      mouseDown = true;
+      onStart(e.clientX, e.clientY);
+    };
+    const onMouseUp = (e: MouseEvent) => {
+      if (mouseDown) onEnd(e.clientX, e.clientY);
+      mouseDown = false;
+    };
+
+    iframeWin.addEventListener("touchstart", onTouchStart, { passive: true });
+    iframeWin.addEventListener("touchend", onTouchEnd, { passive: true });
+    iframeWin.addEventListener("mousedown", onMouseDown);
+    iframeWin.addEventListener("mouseup", onMouseUp);
+
+    return () => {
+      iframeWin.removeEventListener("touchstart", onTouchStart);
+      iframeWin.removeEventListener("touchend", onTouchEnd);
+      iframeWin.removeEventListener("mousedown", onMouseDown);
+      iframeWin.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [rendition]);
+
   // 主题：epub.js 的 themes.select 不会清掉旧主题注入的 <style>，同页来回切会
   // 叠加多个主题样式表（后注入者胜），导致切回日间失效。这里在切换前手动移除
   // 旧主题节点，保证同页切换干净。节点 id 形如 epubjs-inserted-css-{name}。
@@ -191,7 +259,8 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
           r.themes.register("night", NIGHT_THEME);
           // 实际套用（select/fontSize/spread）交给上面的 effect，那里更可控。
         }}
-        // swipeable 会禁用 iframe 内文字选中，必须关
+        // 不开 epub.js 的 swipeable —— 它 preventDefault touchmove 会杀掉文字选中。
+        // 拖动翻页自己实现（见上面的 effect），快速滑动翻页、慢速拖动选中。
         swipeable={false}
         // epub.js 靠 URL 后缀猜类型。我们的地址是 /api/books/{id}/file，
         // 没有 .epub 后缀，它会当成「已解压目录」去请求
