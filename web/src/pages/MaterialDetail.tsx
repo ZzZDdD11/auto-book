@@ -126,15 +126,27 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
         ) : null}
       </header>
 
-      <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 20px 60px" }}>
-        {/* 素材卡片 */}
+      <div
+        style={{
+          maxWidth: 1160,
+          margin: "0 auto",
+          padding: "24px 24px 60px",
+          display: "flex",
+          gap: 24,
+          alignItems: "flex-start",
+        }}
+      >
+        {/* 左：素材卡片，固定宽度，吸顶 */}
         <div
           style={{
+            width: 320,
+            flexShrink: 0,
             padding: "20px 22px",
             borderRadius: 14,
             background: "#fff",
             border: "1px solid #ececec",
-            marginBottom: 20,
+            position: "sticky",
+            top: 24,
           }}
         >
           {/* 书名行 */}
@@ -142,16 +154,21 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
+              alignItems: "flex-start",
               marginBottom: 14,
+              gap: 8,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 3, height: 18, borderRadius: 2, background: "#0f2a24" }} />
-              <span style={{ fontSize: 15, fontWeight: 700 }}>{material.book_title ?? "手动粘贴"}</span>
-              {material.book_author ? (
-                <span style={{ fontSize: 12, color: "#aaa" }}>{material.book_author}</span>
-              ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <span style={{ width: 3, height: 18, borderRadius: 2, background: "#0f2a24", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {material.book_title ?? "手动粘贴"}
+                </div>
+                {material.book_author ? (
+                  <div style={{ fontSize: 11, color: "#aaa" }}>{material.book_author}</div>
+                ) : null}
+              </div>
             </div>
             <button
               onClick={() => setEditing(!editing)}
@@ -159,12 +176,13 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
                 border: "1px solid #e0dedb",
                 background: "transparent",
                 color: "#666",
-                padding: "5px 14px",
+                padding: "5px 12px",
                 borderRadius: 6,
                 fontSize: 12,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 transition: "all 0.15s",
+                flexShrink: 0,
               }}
             >
               {editing ? "取消" : "✎ 编辑"}
@@ -212,6 +230,7 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
                 onClick={onSaveMaterial}
                 disabled={busy}
                 style={{
+                  width: "100%",
                   padding: "9px 24px",
                   border: "none",
                   borderRadius: 8,
@@ -236,7 +255,7 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
                   borderLeft: "3px solid #e8b84b",
                 }}
               >
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: "#333" }}>
+                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.75, color: "#333" }}>
                   {material.source_text}
                 </p>
               </div>
@@ -257,7 +276,8 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
               <div
                 style={{
                   display: "flex",
-                  gap: 12,
+                  flexWrap: "wrap",
+                  gap: 8,
                   marginTop: 12,
                   fontSize: 11,
                   color: "#bbb",
@@ -274,39 +294,50 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
           )}
         </div>
 
-        {/* 五环节面板 */}
-        {job ? (
-          <JobPanel job={job} setJob={setJob} />
-        ) : (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px 0",
-              borderRadius: 14,
-              background: "#fff",
-              border: "1px solid #ececec",
-            }}
-          >
-            <p style={{ fontSize: 36, margin: "0 0 8px" }}>🎬</p>
-            <p style={{ color: "#999", fontSize: 14, marginBottom: 16 }}>这个素材还没出过视频</p>
-            <button
-              onClick={onCreateJob}
-              disabled={busy}
+        {/* 右：任务面板，占据剩余宽度 */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {job ? (
+            <div
               style={{
-                padding: "10px 28px",
-                border: "none",
-                borderRadius: 8,
-                background: "#0f2a24",
-                color: "#fff",
-                fontSize: 15,
-                cursor: busy ? "default" : "pointer",
-                fontFamily: "inherit",
+                padding: "20px 22px",
+                borderRadius: 14,
+                background: "#fff",
+                border: "1px solid #ececec",
               }}
             >
-              {busy ? "创建中…" : "生成视频"}
-            </button>
-          </div>
-        )}
+              <JobPanel job={job} setJob={setJob} />
+            </div>
+          ) : (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 0",
+                borderRadius: 14,
+                background: "#fff",
+                border: "1px solid #ececec",
+              }}
+            >
+              <p style={{ fontSize: 36, margin: "0 0 8px" }}>🎬</p>
+              <p style={{ color: "#999", fontSize: 14, marginBottom: 16 }}>这个素材还没出过视频</p>
+              <button
+                onClick={onCreateJob}
+                disabled={busy}
+                style={{
+                  padding: "10px 28px",
+                  border: "none",
+                  borderRadius: 8,
+                  background: "#0f2a24",
+                  color: "#fff",
+                  fontSize: 15,
+                  cursor: busy ? "default" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {busy ? "创建中…" : "生成视频"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

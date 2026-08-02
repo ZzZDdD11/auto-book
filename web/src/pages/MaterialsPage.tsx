@@ -102,7 +102,7 @@ export function MaterialsPage() {
         </Link>
       </header>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px 60px" }}>
+      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 24px 60px" }}>
         {/* 筛选 */}
         {counts ? (
           <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -143,30 +143,38 @@ export function MaterialsPage() {
             <p style={{ fontSize: 14 }}>还没有素材。去书架打开一本书，选中文字记下想法。</p>
           </div>
         ) : (
-          filtered?.map((m) => (
-            <div
-              key={m.id}
-              style={{
-                marginBottom: 12,
-                padding: "16px 18px",
-                borderRadius: 12,
-                background: "#fff",
-                border: "1px solid #ececec",
-                transition: "box-shadow 0.15s, border-color 0.15s",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
-                e.currentTarget.style.borderColor = "#d5d3d0";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "none";
-                e.currentTarget.style.borderColor = "#ececec";
-              }}
-              onClick={() => (window.location.href = `/material/${m.id}`)}
-            >
-              {/* 头部：书名 + 状态 */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+              gap: 14,
+            }}
+          >
+            {filtered?.map((m) => (
               <div
+                key={m.id}
+                style={{
+                  padding: "16px 18px",
+                  borderRadius: 12,
+                  background: "#fff",
+                  border: "1px solid #ececec",
+                  transition: "box-shadow 0.15s, border-color 0.15s",
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
+                  e.currentTarget.style.borderColor = "#d5d3d0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.borderColor = "#ececec";
+                }}
+                onClick={() => (window.location.href = `/material/${m.id}`)}
+              >
+                {/* 头部：书名 + 状态 */}
+                <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
@@ -249,7 +257,8 @@ export function MaterialsPage() {
                 ) : null}
               </div>
             </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
