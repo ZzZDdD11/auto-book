@@ -250,3 +250,21 @@ export const videoUrl = (jobId: number, version?: number) =>
 /** 某一帧配音的播放地址。 */
 export const audioUrl = (jobId: number, frame: FrameName) =>
   `/api/jobs/${jobId}/audio/${frame}`;
+
+/** 素材列表项（带关联书名和最新 job 状态）。 */
+export type MaterialWithJob = {
+  id: number;
+  source_text: string;
+  my_take: string;
+  chapter: string | null;
+  progress: number | null;
+  created_at: string;
+  book_id: number | null;
+  book_title: string | null;
+  job_id: number | null;
+  job_status: JobStatus | null;
+};
+
+/** 列出所有素材，带关联书名和最新 job 状态。 */
+export const listAllMaterials = () =>
+  get<MaterialWithJob[]>("/api/materials");

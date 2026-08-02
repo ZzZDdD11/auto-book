@@ -40,9 +40,14 @@ export function Shelf() {
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 20px" }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
         <h1 style={{ fontSize: 24, margin: 0 }}>我的书架</h1>
-        <Link to="/compose" style={{ fontSize: 13, color: "#666" }}>
-          手动粘贴入口 →
-        </Link>
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <Link to="/materials" style={{ fontSize: 13, color: "#666" }}>
+            素材管理 →
+          </Link>
+          <Link to="/compose" style={{ fontSize: 13, color: "#666" }}>
+            手动粘贴 →
+          </Link>
+        </div>
       </header>
       <p style={{ color: "#777", fontSize: 14, marginTop: 8 }}>
         上传 EPUB，在网页里读。划一句话、写一句想法，其余全自动。

@@ -160,3 +160,33 @@ async def edit_material(
         background.add_task(_restart_job, job.id or 0)
 
     return {"material_id": material_id, "restarted_jobs": restarted}
+
+
+@router.get("", response_model=list[dict])
+def list_all_materials(session: SessionDep) -> list[dict]:
+    """列出所有素材，带关联书名和最新 job 状态。
+
+    素材管理中心的用途：一眼看到所有素材及其生产进度。
+    """
+    materials = session.exec(select(Material).order_by(Material.created_at.desc())).all()
+    result: list[dict] = []
+    for m in materials:
+        book = session.get(Book, m.book_id) if m.book_id else None
+        # 取最新关联 job
+        jobs = session.exec(
+            select(Job).where(Job.material_id == m.id).order_by(Job.created_at.desc())
+        ).all()
+        latest_job = jobs[0] if jobs else None
+        result.append({
+            "id": m.id,
+            "source_text": m.source_text[:200],
+            "my_take": m.my_take[:200] if m.my_take else "",
+            "chapter": m.chapter,
+            "progress": m.progress,
+            "created_at": m.created_at.isoformat(),
+            "book_id": m.book_id,
+            "book_title": book.title if book else None,
+            "job_id": latest_job.id if latest_job else None,
+            "job_status": latest_job.status.value if latest_job else None,
+        })
+    return result

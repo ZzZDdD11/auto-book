@@ -694,6 +694,26 @@ export function Reader() {
     }
   };
 
+  const [sidebarWidth, setSidebarWidth] = useState(330);
+  const dragging = useRef(false);
+
+  // 拖动分隔条调整侧栏宽度
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      // 侧栏在右侧，宽度 = 窗口宽度 - 鼠标 x
+      const w = window.innerWidth - e.clientX;
+      setSidebarWidth(Math.max(240, Math.min(600, w)));
+    };
+    const onUp = () => { dragging.current = false; document.body.style.cursor = ""; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
   if (!Number.isFinite(id)) return <p style={{ padding: 40 }}>无效的书籍 ID</p>;
 
   return (
@@ -719,10 +739,29 @@ export function Reader() {
         />
       </div>
 
+      {/* 可拖动分隔条 */}
+      <div
+        onMouseDown={() => {
+          dragging.current = true;
+          document.body.style.cursor = "col-resize";
+        }}
+        style={{
+          width: 5,
+          flexShrink: 0,
+          cursor: "col-resize",
+          background: ui.border,
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = ui.accent)}
+        onMouseLeave={(e) => {
+          if (!dragging.current) e.currentTarget.style.background = ui.border;
+        }}
+      />
+
       {/* 右侧：书信息 + 划线列表 + 任务状态 */}
       <aside
         style={{
-          width: 330,
+          width: sidebarWidth,
           flexShrink: 0,
           borderLeft: `1px solid ${ui.border}`,
           padding: "18px 18px 40px",
