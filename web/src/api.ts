@@ -246,3 +246,7 @@ export const listHistory = (jobId: number) =>
 /** 视频下载地址。默认最新版，可指定 version 拉历史。 */
 export const videoUrl = (jobId: number, version?: number) =>
   version ? `/api/jobs/${jobId}/video?version=${version}` : `/api/jobs/${jobId}/video`;
+
+/** 某一帧配音的播放地址。 */
+export const audioUrl = (jobId: number, frame: FrameName) =>
+  `/api/jobs/${jobId}/audio/${frame}`;

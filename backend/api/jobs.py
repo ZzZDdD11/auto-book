@@ -192,6 +192,31 @@ def list_history(job_id: int, session: SessionDep) -> list[dict[str, Any]]:
     ]
 
 
+@router.get("/{job_id}/audio/{frame}")
+def download_audio(job_id: int, frame: str, session: SessionDep) -> FileResponse:
+    """下发某一帧的配音 mp3。
+
+    frame 白名单校验 —— 它进文件路径和查库。
+    """
+    if frame not in FRAME_ORDER:
+        raise HTTPException(status_code=404, detail="不支持的帧名")
+
+    asset = session.exec(
+        select(Asset).where(
+            Asset.job_id == job_id,
+            Asset.kind == f"audio:{frame}",
+        )
+    ).first()
+    if asset is None:
+        raise HTTPException(status_code=404, detail="还没有这一帧的配音")
+
+    return FileResponse(
+        _asset_file(asset),
+        media_type="audio/mpeg",
+        filename=f"auto-book-{job_id}-{frame}.mp3",
+    )
+
+
 @router.get("/{job_id}/cover/{ratio}")
 def download_cover(
     job_id: int,
