@@ -13,14 +13,27 @@ export type MyTakeData = {
  * 这一帧是整个产品的存在理由。
  * 独立配色 + 左侧竖线，视觉上明确区分「作者说的」和「我说的」。
  */
-export const MyTake: React.FC<{ theme: Theme; data: MyTakeData }> = ({ theme, data }) => {
+export const MyTake: React.FC<{
+  theme: Theme;
+  data: MyTakeData;
+  index?: number;
+  total?: number;
+}> = ({ theme, data, index, total }) => {
   const frame = useCurrentFrame();
   const grow = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp" });
   const fade = interpolate(frame, [6, 24], [0, 1], { extrapolateRight: "clamp" });
   const accent = theme.takeAccent ?? "#4fd1a5";
 
   return (
-    <Shell bg={theme.takeBg ?? "#0f2a24"} fg="#eaf5f0" label="我的想法">
+    <Shell
+      bg={theme.takeBg ?? "#0f2a24"}
+      fg="#eaf5f0"
+      label="我的想法"
+      accent={theme.takeAccent ?? "#4fd1a5"}
+      kind="my_take"
+      index={index}
+      total={total}
+    >
       <div style={{ display: "flex", gap: 26 }}>
         <div
           style={{

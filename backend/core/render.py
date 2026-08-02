@@ -68,6 +68,29 @@ def cleanup_job_public_dir(job_id: int) -> None:
         shutil.rmtree(target, ignore_errors=True)
 
 
+def resolve_bgm(bgm_src: str | None) -> str | None:
+    """校验 BGM 文件真实存在于 public 下，返回可用的 staticFile 路径。
+
+    文件不存在就返回 None（视频无 BGM 照样出片），而不是让整个任务失败 ——
+    BGM 是装饰，脚本和配音才是成品主体，不该因为少个音乐文件就废掉
+    前面花钱生成的内容。
+
+    bgm_src 来自配置（env 可覆盖），仍然做路径穿越校验：
+    配置不等于可信，写错一个 ../ 就会把 public 之外的文件带进产物。
+    """
+    if not bgm_src:
+        return None
+
+    public_root = _public_root()
+    target = (public_root / bgm_src).resolve()
+    if not target.is_relative_to(public_root):
+        raise RenderError(f"BGM 路径越出 public 范围：{bgm_src!r}")
+    if not target.is_file():
+        return None
+    # staticFile() 要的是相对 public 的 POSIX 路径
+    return target.relative_to(public_root).as_posix()
+
+
 def build_render_command(
     npx: str, props_path: Path, out_path: Path, concurrency: str
 ) -> list[str]:

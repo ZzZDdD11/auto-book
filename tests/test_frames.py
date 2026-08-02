@@ -24,7 +24,10 @@ def valid_script_dict():
         },
         "breakdown": {
             "kicker": "作者的意思是",
-            "points": ["意志力是消耗品，环境是常量", "把手机放进抽屉，比下决心有效"],
+            "points": [
+                {"text": "意志力是消耗品，环境是常量", "evidence": "环境是看不见的手"},
+                {"text": "把手机放进抽屉，比下决心有效", "evidence": None},
+            ],
             "narration": "作者的核心主张是，意志力是消耗品，环境才是常量。",
         },
         "my_take": {
@@ -69,16 +72,24 @@ def test_progress_out_of_range_rejected():
 
 def test_breakdown_requires_at_least_two_points():
     data = valid_script_dict()
-    data["breakdown"]["points"] = ["只有一条"]
+    data["breakdown"]["points"] = [{"text": "只有一条"}]
     with pytest.raises(ValidationError):
         Script.model_validate(data)
 
 
 def test_breakdown_rejects_more_than_three_points():
     data = valid_script_dict()
-    data["breakdown"]["points"] = ["一", "二", "三", "四"]
+    data["breakdown"]["points"] = [{"text": t} for t in ("一", "二", "三", "四")]
     with pytest.raises(ValidationError):
         Script.model_validate(data)
+
+
+def test_point_evidence_defaults_to_none():
+    """evidence 可省略。省略与 null 必须等价，否则 prompt 少写一个字段就崩。"""
+    data = valid_script_dict()
+    data["breakdown"]["points"] = [{"text": "第一条"}, {"text": "第二条"}]
+    script = Script.model_validate(data)
+    assert all(p.evidence is None for p in script.breakdown.points)
 
 
 def test_hook_narration_may_be_empty():

@@ -29,13 +29,14 @@ type Props = {
  */
 export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props) {
   const [location, setLocation] = useState<string | number>(initialCfi ?? 0);
-  const renditionRef = useRef<Rendition | null>(null);
+  // 必须用 state 而不是 ref：ref 赋值不触发重渲染，绑事件的 effect 就永远
+  // 只在 rendition 还是 null 时跑过一次，selected 事件绑不上，划线会失效。
+  const [rendition, setRendition] = useState<Rendition | null>(null);
   // 用 ref 存回调，避免 rendition 的事件监听绑到过期的闭包上
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
   useEffect(() => {
-    const rendition = renditionRef.current;
     if (!rendition) return;
 
     const handler = (cfi: string, contents: { window: Window }) => {
@@ -77,7 +78,7 @@ export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props)
     return () => {
       rendition.off("selected", handler);
     };
-  }, [renditionRef.current]);
+  }, [rendition]);
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
@@ -88,16 +89,21 @@ export function BookView({ url, initialCfi, onSelect, onPositionChange }: Props)
           setLocation(cfi);
           onPositionChange?.(cfi);
         }}
-        getRendition={(rendition) => {
-          renditionRef.current = rendition;
+        getRendition={(r) => {
+          setRendition(r);
           // 让选中在深色文字上也看得清
-          rendition.themes.default({
+          r.themes.default({
             "::selection": { background: "rgba(232,184,75,0.35)" },
             p: { "line-height": "1.8", "font-size": "1.05rem" },
           });
         }}
         // swipeable 会禁用 iframe 内文字选中，必须关
         swipeable={false}
+        // epub.js 靠 URL 后缀猜类型。我们的地址是 /api/books/{id}/file，
+        // 没有 .epub 后缀，它会当成「已解压目录」去请求
+        // /api/books/{id}/META-INF/container.xml，必然 404 → Load error。
+        // 所以必须显式告诉它这是一个打包的 epub 二进制流。
+        epubInitOptions={{ openAs: "epub" }}
         epubOptions={{
           // EPUB 是不可信输入，绝不开脚本执行
           allowScriptedContent: false,

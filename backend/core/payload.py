@@ -35,6 +35,8 @@ def build_payload(
     silent_s: float,
     theme: Theme | None = None,
     bgm_src: str | None = None,
+    bgm_volume: float = 0.10,
+    bgm_volume_solo: float = 0.26,
 ) -> RenderPayload:
     by_kind = {a.kind: a for a in audios}
     missing = [k for k in FRAME_ORDER if k not in by_kind]
@@ -49,7 +51,8 @@ def build_payload(
     }
 
     frames: list[FramePayload] = []
-    for kind, frame in script.iter_frames():
+    total = len(FRAME_ORDER)
+    for i, (kind, frame) in enumerate(script.iter_frames()):
         audio = by_kind[kind]
         if audio.tts.duration_s > 0:
             seconds = audio.tts.duration_s + padding_s
@@ -65,6 +68,8 @@ def build_payload(
                 kind=kind,
                 duration_in_frames=max(1, math.ceil(seconds * fps)),
                 data=data,
+                index=i,
+                total=total,
                 audio_src=audio.public_src,
                 captions=group_captions(audio.tts.segments),
             )
@@ -75,4 +80,6 @@ def build_payload(
         theme=theme or Theme(),
         frames=frames,
         bgm_src=bgm_src,
+        bgm_volume=bgm_volume,
+        bgm_volume_solo=bgm_volume_solo,
     )

@@ -29,8 +29,36 @@ cd web && npm install && cd ..
 
 cp .env.example .env   # 填入 DEEPSEEK_API_KEY
 
+.venv/bin/python scripts/make_bgm.py   # 生成背景音乐（只需一次）
+
 ./scripts/dev.sh       # 打开 http://localhost:5173
 ```
+
+## 配音与背景音乐
+
+**背景音乐是自己合成的，不用现成音乐。** 音乐版权是抖音/视频号自动检测的重点，
+会直接消音或限流，风险比引用书籍原文高得多。`scripts/make_bgm.py` 用标准库合成
+两首无版权 BGM，版权属于自己：
+
+- `ink.mp3` —— 缓慢琶音 + 低音垫，有一点旋律感（默认）
+- `dusk.mp3` —— 纯低音垫，几乎察觉不到，最不抢戏
+
+BGM 不入 git（每次生成结果一致，没必要存二进制）。换曲子改 `BGM_SRC=bgm/dusk.mp3`。
+
+**BGM 音量分两档，不是一个固定值。** 固定值必然二选一地错：够撑住无人声的钩子帧，
+就会盖住人声；不盖人声，钩子帧开头就发空（实测原本是 `-inf` 完全静音）。
+所以有人声时 `0.10`、无人声时 `0.26`，切换处用 0.4s 过渡，结尾 2s 淡出。
+实测有人声段只抬高 1.2dB，音乐在但不抢。
+
+**换音色先试听，别看参数猜。**
+
+```bash
+.venv/bin/python scripts/preview_voice.py   # 合成候选音色 + 混上 BGM
+```
+
+edge-tts 的中文音色实测只有 8 个。默认用 `zh-CN-YunyangNeural`（男声，微软官方人格
+标签 Professional/Reliable，播报腔）。备选 `zh-CN-XiaoxiaoNeural`（女声，Warm）。
+原先的 `zh-CN-YunxiNeural` 标签是 Lively/Sunshine，少年音，念读书感悟违和。
 
 ## 开发
 

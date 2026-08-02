@@ -44,7 +44,7 @@ def build_copy_prompt(script: Script) -> str:
             "",
             f"视频钩子：{' / '.join(script.hook.lines)}",
             f"原文金句：{script.quote.text}",
-            f"作者观点：{'；'.join(script.breakdown.points)}",
+            f"作者观点：{'；'.join(p.text for p in script.breakdown.points)}",
             f"我的想法：{script.my_take.text}",
             f"结尾提问：{script.outro.question}",
         ]

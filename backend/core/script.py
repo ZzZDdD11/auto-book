@@ -35,7 +35,12 @@ _STRUCTURE = """你必须返回一个 JSON 对象，字段如下（不要多、�
   },
   "breakdown": {
     "kicker": "小标题，不超过 10 字",
-    "points": ["2 到 3 条，每条不超过 14 字"],
+    "points": [
+      {
+        "text": "结论，不超过 24 字",
+        "evidence": "支撑这条结论的原文片段，或 null"
+      }
+    ],
     "narration": "把这几条讲清楚的口语句子，60 到 110 字"
   },
   "my_take": {
@@ -66,9 +71,22 @@ _STRUCTURE = """你必须返回一个 JSON 对象，字段如下（不要多、�
 - highlight 必须是 lines 中某一行的**原样照抄**，不能是新写的句子，也不能超过 8 字，否则会折行破版。
 
 关于 breakdown：
-- 几条之间必须是**不同的信息**，不能是同一句话的三种说法。
+- 2 到 3 条，几条之间必须是**不同的信息**，不能是同一句话的三种说法。
 - 如果你发现只能想出一个要点，就只写 2 条，别硬凑成 3 条同义句。
-- 每条不超过 14 字，超了在竖屏上会折行。
+- points[].text 是你的结论，不超过 24 字，超了在竖屏上会折行。
+
+关于 breakdown 里的 evidence（这条规则会被程序检查，写错会被丢弃）：
+- evidence 必须是**原文摘录里真实出现过的连续文字**，直接照抄。
+- 可以截取一段、可以只取半句，但**不许改写、不许润色、不许补字、不许把两处拼接**。
+- 原文里找不到能支撑这条结论的句子时，evidence 填 null。
+- **宁可填 null，也不要写一句意思相近的话。** 程序会拿 evidence 去原文里比对，
+  凡是找不到的一律丢弃，你写了也是白写。
+- 好例子（原文有「可以通过基因或基金传递给下一代」这句）：
+  {"text": "寿命智商财富都能传，唯独心智不能", "evidence": "可以通过基因或基金传递给下一代"}
+- 坏例子（把原文换了个说法，会被程序丢掉）：
+  {"text": "寿命智商财富都能传，唯独心智不能", "evidence": "这些东西可以遗传给孩子"}
+- 坏例子（原文里没有这句话，凭理解补的，会被丢掉）：
+  {"text": "心智决定你怎么看人和事", "evidence": "态度先于判断，判断先于选择"}
 
 关于数字，不许编造：
 - book_index 和 year 必须原样使用我在下面提供的数值，不要自己改、不要写「第1本」这种猜的数字。
@@ -139,9 +157,53 @@ def build_user_prompt(data: ScriptInput) -> str:
 
 
 async def generate_script(data: ScriptInput, client: DeepSeekClient) -> tuple[Script, int]:
-    """返回 (五帧脚本, 消耗 token 数)。"""
-    return await client.complete_json(
+    """返回 (五帧脚本, 消耗 token 数)。
+
+    返回前会剔除假引用 —— 见 strip_fake_evidence。
+    """
+    script, tokens = await client.complete_json(
         system_prompt_for(data.mode),
         build_user_prompt(data),
         Script,
     )
+    strip_fake_evidence(script, data.source_text)
+    return script, tokens
+
+
+# 比对时忽略的字符：标点、空白、引号。
+# 模型经常把原文的「，」写成「,」或者干脆省掉，那不算改写，不该因此判假。
+_IGNORED_IN_MATCH = frozenset(
+    "，。！？；：、,.!?;:\u201c\u201d\u2018\u2019\"'（）()《》〈〉[]【】—-–…·　 \t\n\r"
+)
+
+
+def _normalize_for_match(text: str) -> str:
+    return "".join(c for c in text if c not in _IGNORED_IN_MATCH)
+
+
+def strip_fake_evidence(script: Script, source_text: str) -> int:
+    """把不是原文子串的 evidence 置为 None，返回剔除条数。
+
+    为什么必须在代码里兜住：prompt 已经写明「只能照抄原文」并给了正反例子，
+    但模型仍会自作主张写一句意思相近的话 —— 这与 HookFrame.check_highlight
+    要解决的是同一类问题。
+
+    而假引用比没有引用严重得多：观众一旦发现「原文」是编的，
+    账号会失去全部可信度，而「真读过」正是本产品与洗稿账号唯一的区别。
+    所以取舍很明确：宁可少一行，也不留一句可能是假的引用。
+
+    已知代价：模型好心写的、内容正确的解释性文字，会因为不在原文里而被丢弃。
+    """
+    haystack = _normalize_for_match(source_text)
+    removed = 0
+
+    for point in script.breakdown.points:
+        if point.evidence is None:
+            continue
+        needle = _normalize_for_match(point.evidence)
+        # 去掉标点后为空，或不是原文子串，都算无效
+        if not needle or needle not in haystack:
+            point.evidence = None
+            removed += 1
+
+    return removed

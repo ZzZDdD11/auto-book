@@ -28,7 +28,7 @@
       "type": "object"
     },
     "FramePayload": {
-      "description": "一帧的全部渲染信息。\n\ndata 是对应帧模型 dump 出来的字典，结构由 kind 决定。\n这里刻意用 dict 而不是联合类型：Python 侧已经用 Script 校验过了，\n这一层只负责搬运，不重复校验。",
+      "description": "一帧的全部渲染信息。\n\ndata 是对应帧模型 dump 出来的字典，结构由 kind 决定。\n这里刻意用 dict 而不是联合类型：Python 侧已经用 Script 校验过了，\n这一层只负责搬运，不重复校验。\n\nindex / total 放在这一层而不是各帧 data 里，因为它们是「播放位置」\n而不是内容 —— build_payload 遍历时天然知道，不需要 AI 参与。",
       "properties": {
         "kind": {
           "enum": [
@@ -49,6 +49,18 @@
         "data": {
           "title": "Data",
           "type": "object"
+        },
+        "index": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "total": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Total",
+          "type": "integer"
         },
         "audioSrc": {
           "anyOf": [
@@ -152,10 +164,23 @@
       "title": "Bgmsrc"
     },
     "bgmVolume": {
-      "default": 0.12,
+      "default": 0.1,
       "maximum": 1.0,
       "minimum": 0.0,
       "title": "Bgmvolume",
+      "type": "number"
+    },
+    "bgmVolumeSolo": {
+      "default": 0.26,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Bgmvolumesolo",
+      "type": "number"
+    },
+    "bgmFadeOutS": {
+      "default": 2.0,
+      "minimum": 0.0,
+      "title": "Bgmfadeouts",
       "type": "number"
     }
   },

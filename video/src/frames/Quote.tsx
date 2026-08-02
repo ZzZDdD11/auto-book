@@ -12,7 +12,12 @@ export type QuoteData = {
   book_title: string;
 };
 
-export const Quote: React.FC<{ theme: Theme; data: QuoteData }> = ({ theme, data }) => {
+export const Quote: React.FC<{
+  theme: Theme;
+  data: QuoteData;
+  index?: number;
+  total?: number;
+}> = ({ theme, data, index, total }) => {
   const frame = useCurrentFrame();
   const fade = interpolate(frame, [0, 16], [0, 1], { extrapolateRight: "clamp" });
 
@@ -21,6 +26,11 @@ export const Quote: React.FC<{ theme: Theme; data: QuoteData }> = ({ theme, data
       bg={theme.paper ?? "#f4f1ec"}
       fg={theme.ink ?? "#12100e"}
       label={`原文${data.chapter ? ` · ${data.chapter}` : ""}`}
+      accent={theme.accent ?? "#e8b84b"}
+      kind="quote"
+      index={index}
+      total={total}
+      align="start"
     >
       <div style={{ opacity: fade }}>
         <div

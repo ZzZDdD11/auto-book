@@ -20,3 +20,6 @@ video/out/
 .superpowers/
 .DS_Store
 *.log
+
+# BGM 由 scripts/make_bgm.py 生成，不入库（每次生成结果一致）
+video/public/bgm/

@@ -11,7 +11,12 @@ export type HookData = {
   book_author: string;
 };
 
-export const Hook: React.FC<{ theme: Theme; data: HookData }> = ({ theme, data }) => {
+export const Hook: React.FC<{
+  theme: Theme;
+  data: HookData;
+  index?: number;
+  total?: number;
+}> = ({ theme, data, index, total }) => {
   const frame = useCurrentFrame();
   const rise = interpolate(frame, [0, 18], [40, 0], { extrapolateRight: "clamp" });
   const fade = interpolate(frame, [0, 14], [0, 1], { extrapolateRight: "clamp" });
@@ -22,6 +27,10 @@ export const Hook: React.FC<{ theme: Theme; data: HookData }> = ({ theme, data }
       bg={theme.ink ?? "#12100e"}
       fg={theme.paper ?? "#f4f1ec"}
       label={`${data.book_title}${data.book_author ? ` · ${data.book_author}` : ""}`}
+      accent={accent}
+      kind="hook"
+      index={index}
+      total={total}
     >
       <div
         style={{

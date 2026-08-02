@@ -50,11 +50,17 @@ class FramePayload(CamelModel):
     data 是对应帧模型 dump 出来的字典，结构由 kind 决定。
     这里刻意用 dict 而不是联合类型：Python 侧已经用 Script 校验过了，
     这一层只负责搬运，不重复校验。
+
+    index / total 放在这一层而不是各帧 data 里，因为它们是「播放位置」
+    而不是内容 —— build_payload 遍历时天然知道，不需要 AI 参与。
     """
 
     kind: FrameKind
     duration_in_frames: int = Field(gt=0)
     data: dict[str, Any]
+    # 第几帧（从 0 起）与总帧数，供顶部进度条使用
+    index: int = Field(default=0, ge=0)
+    total: int = Field(default=1, gt=0)
     # 相对 video/public 的路径，供 Remotion 的 staticFile() 使用
     audio_src: str | None = None
     captions: list[Caption] = Field(default_factory=list)
@@ -69,7 +75,13 @@ class RenderPayload(CamelModel):
     theme: Theme = Field(default_factory=Theme)
     frames: list[FramePayload] = Field(min_length=1)
     bgm_src: str | None = None
-    bgm_volume: float = Field(default=0.12, ge=0, le=1)
+    # 有人声时的 BGM 音量
+    bgm_volume: float = Field(default=0.10, ge=0, le=1)
+    # 无人声帧的 BGM 音量。分两档是因为固定一个值必然二选一地错：
+    # 够撑住无声的钩子帧，就会盖住人声；不盖人声，钩子帧就发空。
+    bgm_volume_solo: float = Field(default=0.26, ge=0, le=1)
+    # BGM 收尾淡出秒数，避免视频末尾音乐被硬切
+    bgm_fade_out_s: float = Field(default=2.0, ge=0)
 
     @property
     def total_frames(self) -> int:

@@ -65,11 +65,31 @@ class QuoteFrame(BaseFrame):
     progress: int = Field(ge=0, le=100)
 
 
+class Point(BaseModel):
+    """拆解帧的一条要点：结论 + 原文依据。
+
+    evidence 刻意用 `str | None` 而不是默认空字符串：
+    None 表示「这条没有原文依据」，渲染时整行不出现；
+    空字符串会渲出一个空占位而破版。类型上就把这个区别固化下来。
+
+    evidence 是否真的来自原文，由 script.py 在返回前做子串校验 ——
+    假引用比没有引用严重得多，它会让账号失去全部可信度。
+    """
+
+    text: Text = Field(max_length=24)
+    evidence: Text | None = Field(default=None, max_length=40)
+
+
 class BreakdownFrame(BaseFrame):
-    """作者观点拆解。逐条浮现。"""
+    """作者观点拆解。逐条浮现。
+
+    每条要点带一句原文依据，这是与洗稿账号的区别所在：
+    结论可以是你的，依据必须是书里真有的。
+    """
 
     kicker: Text = Field(max_length=20)
-    points: list[Text] = Field(min_length=2, max_length=3)
+    # 保持 2-3 条，不强制 3 条：强制会让模型在素材不足时编第三条
+    points: list[Point] = Field(min_length=2, max_length=3)
 
 
 class MyTakeFrame(BaseFrame):

@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 from backend.core import copywrite, render
 from backend.core import script as script_mod
 from backend.core import tts as tts_mod
+from backend.core.cover import render_covers
 from backend.core.deepseek import DeepSeekClient
 from backend.core.payload import FrameAudio, build_payload
 from backend.models import Asset, Book, Job, JobStatus, Material
@@ -73,6 +74,7 @@ async def run_job(
     render_video: Callable = render.render_video,
     generate_copy: Callable = copywrite.generate_copy,
     cleanup_public: Callable = render.cleanup_job_public_dir,
+    make_covers: Callable = render_covers,
 ) -> None:
     settings = get_settings()
     job = session.get(Job, job_id)
@@ -143,6 +145,9 @@ async def run_job(
             fps=settings.fps,
             padding_s=settings.frame_padding_s,
             silent_s=settings.silent_frame_s,
+            bgm_src=render.resolve_bgm(settings.bgm_src),
+            bgm_volume=settings.bgm_volume,
+            bgm_volume_solo=settings.bgm_volume_solo,
         )
         props_path = work_dir / "props.json"
         props_path.write_text(
@@ -153,6 +158,20 @@ async def run_job(
         out_path = work_dir / "video.mp4"
         render_video(props_path, out_path)
         session.add(Asset(job_id=job.id, kind="video", path=str(out_path)))
+        session.commit()
+
+        # ---- 阶段 3.5：封面 ----
+        # 封面是附加产物，失败不该让整个任务废掉 ——
+        # 视频和文案才是主体，前面花的 AI 钱都在那里。
+        try:
+            covers = make_covers(script, work_dir / "covers")
+        except Exception as exc:  # noqa: BLE001  封面失败不影响出片
+            covers = {}
+            job.error = f"封面生成失败（视频正常）：{type(exc).__name__}: {exc}"[:1000]
+        for ratio, path in covers.items():
+            session.add(
+                Asset(job_id=job.id, kind=f"cover:{ratio}", path=str(path))
+            )
         session.commit()
 
         # ---- 阶段 4：文案 ----
