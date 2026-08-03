@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     # 会把上一段停留的位置存成一条历史记忆点。
     reading_session_gap_minutes: int = 30
 
+    # 前端页面的公开地址。本机开发默认是 vite dev server；部署到服务器后
+    # 必须改成 nginx 对外的域名（比如 https://auto-book.dryz.top），否则
+    # 访问后端根路径时会重定向到访问者自己设备上的 localhost，对方打不开。
+    # 同时也是 CORS 白名单的一部分。
+    frontend_url: str = "http://localhost:5273"
+
     @property
     def epub_dir(self) -> Path:
         return self.storage_dir / "epubs"
