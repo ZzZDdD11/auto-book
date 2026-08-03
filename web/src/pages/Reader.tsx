@@ -17,6 +17,7 @@ import {
 } from "../api";
 import { BookView, type BookViewHandle, type PositionInfo, type SelectionInfo } from "../components/BookView";
 import { JobPanel, STATUS_LABEL } from "../components/JobPanel";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useJobPolling } from "../hooks/useJobPolling";
 import {
   useReaderSettings,
@@ -873,6 +874,8 @@ export function Reader() {
 
   const { settings, toggleTheme, bumpFont, cycleSpread } = useReaderSettings();
   const ui = useUiPalette(settings);
+  const isMobile = useIsMobile();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const bookRef = useRef<BookViewHandle>(null);
 
@@ -966,9 +969,77 @@ export function Reader() {
 
   if (!Number.isFinite(id)) return <p style={{ padding: 40 }}>无效的书籍 ID</p>;
 
+  const sidebarContent = (
+    <>
+      <Link to="/" style={{ fontSize: 13, color: ui.sub }}>
+        ← 书架
+      </Link>
+      <h2 style={{ fontSize: 17, margin: "10px 0 2px", color: ui.text }}>{book?.title ?? "加载中…"}</h2>
+      <p style={{ margin: 0, fontSize: 12, color: ui.sub }}>{book?.author}</p>
+      <p style={{ fontSize: 12, color: ui.accent, marginTop: 10 }}>
+        选中正文可连续划多处，右上角排队等待处理，点「写想法」再产出内容。
+      </p>
+
+      {notice ? (
+        <p style={{ fontSize: 12, color: ui.success, marginTop: 8 }}>{notice}</p>
+      ) : null}
+      {error ? (
+        <p style={{ fontSize: 12, color: ui.error, whiteSpace: "pre-wrap" }}>{error}</p>
+      ) : null}
+
+      {job ? (
+        running ? (
+          <p style={{ fontSize: 13, marginTop: 14, color: ui.text }}>
+            任务 #{job.id} · <b>{STATUS_LABEL[job.status]}…</b>
+          </p>
+        ) : (
+          <JobPanel
+            job={job}
+            setJob={setJob}
+            ui={{
+              border: ui.border,
+              panelAlt: ui.panelAlt,
+              text: ui.text,
+              sub: ui.sub,
+              accent: ui.accent,
+              accentText: ui.accentText,
+              errorBg: settings.theme === "night" ? "#2a1a1d" : "#fdf2f0",
+              errorText: settings.theme === "night" ? "#e07a6a" : "#8a2617",
+            }}
+          />
+        )
+      ) : null}
+
+      {book ? (
+        <ReadingProgress
+          book={book}
+          checkpoints={checkpoints}
+          ui={ui}
+          onGoto={(cfi) => {
+            bookRef.current?.goto(cfi);
+            setDrawerOpen(false);
+          }}
+        />
+      ) : null}
+
+      <h3 style={{ fontSize: 14, marginTop: 26, marginBottom: 10, color: ui.sub }}>
+        划线 {materials.length > 0 ? `（${materials.length}）` : ""}
+      </h3>
+      <MaterialList
+        materials={materials}
+        ui={ui}
+        onGoto={(cfi) => {
+          bookRef.current?.goto(cfi);
+          setDrawerOpen(false);
+        }}
+        onEdit={(m) => setEditMaterial(m)}
+      />
+    </>
+  );
+
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: ui.panel }}>
-      {/* 左侧：阅读区 */}
+      {/* 阅读区：手机上全屏，桌面上占左边剩余空间 */}
       <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
         <BookView
           ref={bookRef}
@@ -995,97 +1066,114 @@ export function Reader() {
             setPending((prev) => prev.filter((p) => p.info.cfi !== cfi))
           }
         />
+
+        {isMobile ? (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            style={{
+              position: "absolute",
+              bottom: 20,
+              right: 16,
+              zIndex: 30,
+              width: 50,
+              height: 50,
+              borderRadius: "50%",
+              border: "none",
+              background: ui.accent,
+              color: ui.accentText,
+              fontSize: 11,
+              lineHeight: 1.3,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(0,0,0,.25)",
+            }}
+          >
+            划线
+            <br />
+            {materials.length}
+          </button>
+        ) : null}
       </div>
 
-      {/* 可拖动分隔条 */}
-      <div
-        onMouseDown={() => {
-          dragging.current = true;
-          document.body.style.cursor = "col-resize";
-        }}
-        style={{
-          width: 5,
-          flexShrink: 0,
-          cursor: "col-resize",
-          background: ui.border,
-          transition: "background 0.15s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = ui.accent)}
-        onMouseLeave={(e) => {
-          if (!dragging.current) e.currentTarget.style.background = ui.border;
-        }}
-      />
-
-      {/* 右侧：书信息 + 划线列表 + 任务状态 */}
-      <aside
-        style={{
-          width: sidebarWidth,
-          flexShrink: 0,
-          borderLeft: `1px solid ${ui.border}`,
-          padding: "18px 18px 40px",
-          overflowY: "auto",
-          background: ui.panel,
-          color: ui.text,
-        }}
-      >
-        <Link to="/" style={{ fontSize: 13, color: ui.sub }}>
-          ← 书架
-        </Link>
-        <h2 style={{ fontSize: 17, margin: "10px 0 2px", color: ui.text }}>{book?.title ?? "加载中…"}</h2>
-        <p style={{ margin: 0, fontSize: 12, color: ui.sub }}>{book?.author}</p>
-        <p style={{ fontSize: 12, color: ui.accent, marginTop: 10 }}>
-          选中正文可连续划多处，右上角排队等待处理，点「写想法」再产出内容。
-        </p>
-
-        {notice ? (
-          <p style={{ fontSize: 12, color: ui.success, marginTop: 8 }}>{notice}</p>
-        ) : null}
-        {error ? (
-          <p style={{ fontSize: 12, color: ui.error, whiteSpace: "pre-wrap" }}>{error}</p>
-        ) : null}
-
-        {job ? (
-          running ? (
-            <p style={{ fontSize: 13, marginTop: 14, color: ui.text }}>
-              任务 #{job.id} · <b>{STATUS_LABEL[job.status]}…</b>
-            </p>
-          ) : (
-            <JobPanel
-              job={job}
-              setJob={setJob}
-              ui={{
-                border: ui.border,
-                panelAlt: ui.panelAlt,
-                text: ui.text,
-                sub: ui.sub,
-                accent: ui.accent,
-                accentText: ui.accentText,
-                errorBg: settings.theme === "night" ? "#2a1a1d" : "#fdf2f0",
-                errorText: settings.theme === "night" ? "#e07a6a" : "#8a2617",
-              }}
+      {isMobile ? (
+        // 手机上：侧栏收成从右边滑出的浮层，不占阅读区空间
+        <>
+          {drawerOpen ? (
+            <div
+              onClick={() => setDrawerOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 40 }}
             />
-          )
-        ) : null}
-
-        {book ? (
-          <ReadingProgress
-            book={book}
-            checkpoints={checkpoints}
-            ui={ui}
-            onGoto={(cfi) => bookRef.current?.goto(cfi)}
+          ) : null}
+          <aside
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: "min(86vw, 360px)",
+              zIndex: 41,
+              transform: drawerOpen ? "translateX(0)" : "translateX(100%)",
+              transition: "transform .25s ease",
+              padding: "18px 18px 40px",
+              overflowY: "auto",
+              background: ui.panel,
+              color: ui.text,
+              boxShadow: "-4px 0 24px rgba(0,0,0,.2)",
+            }}
+          >
+            <button
+              onClick={() => setDrawerOpen(false)}
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                border: "none",
+                background: "transparent",
+                color: ui.sub,
+                fontSize: 20,
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+            {sidebarContent}
+          </aside>
+        </>
+      ) : (
+        // 桌面上：可拖动分隔条 + 常驻侧栏
+        <>
+          <div
+            onMouseDown={() => {
+              dragging.current = true;
+              document.body.style.cursor = "col-resize";
+            }}
+            style={{
+              width: 5,
+              flexShrink: 0,
+              cursor: "col-resize",
+              background: ui.border,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = ui.accent)}
+            onMouseLeave={(e) => {
+              if (!dragging.current) e.currentTarget.style.background = ui.border;
+            }}
           />
-        ) : null}
-
-        <h3 style={{ fontSize: 14, marginTop: 26, marginBottom: 10, color: ui.sub }}>
-          划线 {materials.length > 0 ? `（${materials.length}）` : ""}
-        </h3>
-        <MaterialList
-          materials={materials}
-          ui={ui}
-          onGoto={(cfi) => bookRef.current?.goto(cfi)}
-          onEdit={(m) => setEditMaterial(m)}
-        />
-      </aside>
+          <aside
+            style={{
+              width: sidebarWidth,
+              flexShrink: 0,
+              borderLeft: `1px solid ${ui.border}`,
+              padding: "18px 18px 40px",
+              overflowY: "auto",
+              background: ui.panel,
+              color: ui.text,
+            }}
+          >
+            {sidebarContent}
+          </aside>
+        </>
+      )}
 
       {active ? (
         <TakeDialog

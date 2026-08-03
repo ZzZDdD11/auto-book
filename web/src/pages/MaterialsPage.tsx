@@ -79,6 +79,8 @@ export function MaterialsPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 10,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -105,7 +107,7 @@ export function MaterialsPage() {
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 24px 60px" }}>
         {/* 筛选 */}
         {counts ? (
-          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             {([
               ["all", `全部 ${counts.all}`],
               ["done", `已完成 ${counts.done}`],

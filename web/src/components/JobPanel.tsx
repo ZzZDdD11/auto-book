@@ -15,6 +15,7 @@ import {
   type JobStatus,
   type Script,
 } from "../api";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 export const STATUS_LABEL: Record<JobStatus, string> = {
   pending: "排队中",
@@ -136,6 +137,7 @@ export function JobPanel({
   setJob: (j: JobOut | null) => void;
 }) {
   const c = p ?? DEFAULT_PALETTE;
+  const isMobile = useIsMobile();
   const [busy, setBusy] = useState(false);
   const [editingFrame, setEditingFrame] = useState<FrameName | null>(null);
   const [tab, setTab] = useState<Stage>(defaultTab(job.status));
@@ -213,13 +215,16 @@ export function JobPanel({
         </pre>
       ) : null}
 
-      {/* 横向标签：五个环节并排，充分利用宽度 */}
+      {/* 横向标签：桌面上五个等分格子并排；手机上放不下 5 等分（字会挤成两行认不清），
+          改成横向可滑动，每个标签固定宽度。 */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${STAGES.length}, 1fr)`,
+          display: isMobile ? "flex" : "grid",
+          gridTemplateColumns: isMobile ? undefined : `repeat(${STAGES.length}, 1fr)`,
           gap: 6,
           marginBottom: 16,
+          overflowX: isMobile ? "auto" : undefined,
+          WebkitOverflowScrolling: isMobile ? "touch" : undefined,
         }}
       >
         {STAGES.map(({ key, label }) => {
@@ -243,6 +248,8 @@ export function JobPanel({
                 fontFamily: "inherit",
                 position: "relative",
                 transition: "all 0.15s",
+                flexShrink: isMobile ? 0 : undefined,
+                width: isMobile ? 72 : undefined,
               }}
             >
               <span

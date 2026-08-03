@@ -38,7 +38,7 @@ export function Shelf() {
 
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 20px" }}>
-      <header style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
+      <header style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 24, margin: 0 }}>我的书架</h1>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <Link to="/materials" style={{ fontSize: 13, color: "#666" }}>

@@ -9,8 +9,10 @@ import {
   type MaterialFull,
 } from "../api";
 import { JobPanel } from "../components/JobPanel";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 export function MaterialDetail({ materialId }: { materialId: number }) {
+  const isMobile = useIsMobile();
   const [material, setMaterial] = useState<MaterialFull | null>(null);
   const [job, setJob] = useState<JobOut | null>(null);
   const [editing, setEditing] = useState(false);
@@ -132,20 +134,22 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
           margin: "0 auto",
           padding: "24px 24px 60px",
           display: "flex",
+          flexDirection: isMobile ? "column" : "row",
           gap: 24,
           alignItems: "flex-start",
         }}
       >
-        {/* 左：素材卡片，固定宽度，吸顶 */}
+        {/* 左：素材卡片。桌面上固定宽度+吸顶，手机上占满宽度、跟着页面滚动 */}
         <div
           style={{
-            width: 320,
+            width: isMobile ? "100%" : 320,
             flexShrink: 0,
+            boxSizing: "border-box",
             padding: "20px 22px",
             borderRadius: 14,
             background: "#fff",
             border: "1px solid #ececec",
-            position: "sticky",
+            position: isMobile ? "static" : "sticky",
             top: 24,
           }}
         >
@@ -294,8 +298,8 @@ export function MaterialDetail({ materialId }: { materialId: number }) {
           )}
         </div>
 
-        {/* 右：任务面板，占据剩余宽度 */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* 右：任务面板，占据剩余宽度（手机上占满） */}
+        <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : undefined }}>
           {job ? (
             <div
               style={{

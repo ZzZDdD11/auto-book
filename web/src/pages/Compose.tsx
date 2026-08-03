@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createJob, createMaterial, type Mode } from "../api";
 import { JobPanel, STATUS_LABEL } from "../components/JobPanel";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useJobPolling } from "../hooks/useJobPolling";
 
 const inputStyle: React.CSSProperties = {
@@ -27,6 +28,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 /** 手动粘贴入口。给纸质书、微信读书、PDF 用 —— 这些没法走阅读器。 */
 export function Compose() {
+  const isMobile = useIsMobile();
   const [bookTitle, setBookTitle] = useState("");
   const [bookAuthor, setBookAuthor] = useState("");
   const [sourceText, setSourceText] = useState("");
@@ -85,7 +87,7 @@ export function Compose() {
             style={inputStyle}
           />
         </Field>
-        <div style={{ display: "flex", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 14 }}>
           <Field label="章节（可留空）">
             <input
               value={chapter}
