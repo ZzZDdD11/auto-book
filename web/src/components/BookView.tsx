@@ -234,19 +234,30 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       }
     };
 
+    // 手机上一次触摸（点/滑）结束后，浏览器还会补发一组合成的 mouse 事件
+    // （mousedown/mouseup）。如果 mouse 处理器不加区分，就会把同一个动作处理
+    // 两遍——轻点被 touchend 切一次工具条、又被合成的 mouseup 切回去，净效果
+    // 是"点了没反应"（这正是之前 tap 显不出工具条的原因）；滑动同理会翻两页。
+    // 所以 mouse 处理器只在"最近没发生过 touch"时才生效（纯桌面鼠标场景）。
+    let lastTouchEnd = 0;
+
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) onStart(e.touches[0].clientX, e.touches[0].clientY);
     };
     const onTouchEnd = (e: TouchEvent) => {
+      lastTouchEnd = Date.now();
       if (e.changedTouches.length === 1)
         onEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
     };
     let mouseDown = false;
+    const isSyntheticAfterTouch = () => Date.now() - lastTouchEnd < 700;
     const onMouseDown = (e: MouseEvent) => {
+      if (isSyntheticAfterTouch()) return;
       mouseDown = true;
       onStart(e.clientX, e.clientY);
     };
     const onMouseUp = (e: MouseEvent) => {
+      if (isSyntheticAfterTouch()) return;
       if (mouseDown) onEnd(e.clientX, e.clientY);
       mouseDown = false;
     };
