@@ -120,7 +120,7 @@ const NIGHT_READER_STYLES: IReactReaderStyle = {
  * EPUB 渲染层的唯一封装点。
  *
  * 对外只暴露 onSelect / onPositionChange，内部用什么引擎是实现细节。
- * 目前是 react-reader（底层 epub.js）。若要换成 foliate-js，只改这个文件。
+ * 目前是react-reader（底层 epub.js）。若要换成 foliate-js，只改这个文件。
  *
  * 两个不能动的约束：
  *   1. 不能开 swipeable —— 它会禁用 iframe 内的文字选中，划线就没了
@@ -178,16 +178,22 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
   // 主题、字号、单双页各自独立 effect，避免互相触发无谓重算。
   // effect 在 rendition 就绪后同步执行，早于首章内容加载，所以 select 不会闪屏。
 
-  // 拖动翻页：快速水平滑动翻页，慢速拖动选中文字。
-  // 不用 epub.js 的 swipeable —— 它在 touchmove 时preventDefault，
-  // 把选区行为一起杀了。这里只在 touchend 判断：快速且水平为主的滑动才翻页，
-  // 慢速长按的交给浏览器正常选中。
-  // 桌面端也支持：鼠标快速横向拖动翻页，慢速拖动选中。
+  // 拖动翻页：按住任意位置快速水平滑动就翻页，慢速拖动仍然走浏览器正常的
+  // 文字选中（划线要用）。不用 epub.js 的 swipeable —— 它在 touchmove 时
+  // preventDefault，会把选区行为一起杀了。
   //
-  // 之前的实现只在 rendition 刚创建时绑一次：那一刻内容通常还没渲染进 iframe
-  // （getContents() 是空数组），绑定直接短路退出，翻页手势从没生效过；换章后
-  // epub.js 还会换一批新 iframe，旧监听也够不到新的。改成监听 "rendered" 事件，
-  // 每次有新内容渲染（首次加载 / 翻章）都补绑，用 WeakSet 记重复绑定。
+  // 之前两次尝试（绑 rendition 创建时那一刻的 iframe.window / 监听
+  // "rendered" 事件后用 WeakSet 补绑）在真机上都没生效——问题出在"自己伸手
+  // 进 iframe 内部找 window"这条路径本身就不牢靠，时机、事件目标都可能跟
+  // 猜测的不一样，而且没法用无头浏览器的真实触屏动作复现来验证。
+  //
+  // 正确做法是不用自己管 iframe：epub.js 内部本来就会把每个 view 的原生
+  // DOM 事件（touchstart/touchend/mousedown/mouseup 等）转发成 rendition
+  // 级别的事件——见 epubjs/src/rendition.js 构造函数里的
+  // `hooks.content.register(this.passEvents)`，每次任何内容渲染完成
+  // （首次加载/翻章/重排）都会重新执行一遍，换 iframe 天然覆盖，不用我们
+  // 自己判断"什么时候该重新绑定"。直接监听 rendition.on("touchstart", ...)
+  // 拿到的就是原始 DOM 事件对象，用法跟直接绑 window 一样。
   useEffect(() => {
     if (!rendition) return;
 
@@ -205,14 +211,17 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       const dx = x - startX;
       const dy = y - startY;
       const dt = Date.now() - startTime;
-      // 快速（< 500ms）且水平为主（水平位移 > 垂直的 1.5 倍）且超过 50px → 翻页
-      if (dt < 500 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // 快速（< 800ms）且水平为主（水平位移 > 垂直的 1.2倍）且超过 40px →
+      // 翻页。阈值比"理论上刚好够用"松一点，真手指划的动作不会像模拟事件
+      // 那么干净。
+      if (dt < 800 && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        // 手指/鼠标向右移动（dx > 0）→ 上一页；向左移动 → 下一页。
+        // 主流阅读 App（iBooks 等）对 LTR 内容都是这个方向。
         if (dx > 0) rendition.prev();
         else rendition.next();
       }
     };
 
-    // 触摸
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) onStart(e.touches[0].clientX, e.touches[0].clientY);
     };
@@ -220,7 +229,6 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       if (e.changedTouches.length === 1)
         onEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
     };
-    // 鼠标（桌面端）
     let mouseDown = false;
     const onMouseDown = (e: MouseEvent) => {
       mouseDown = true;
@@ -231,26 +239,15 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       mouseDown = false;
     };
 
-    const bound = new WeakSet<Window>();
-    const bindAll = () => {
-      const contents = rendition.getContents() as unknown as { window?: Window }[];
-      for (const c of contents) {
-        const win = c.window;
-        if (!win || bound.has(win)) continue;
-        bound.add(win);
-        win.addEventListener("touchstart", onTouchStart, { passive: true });
-        win.addEventListener("touchend", onTouchEnd, { passive: true });
-        win.addEventListener("mousedown", onMouseDown);
-        win.addEventListener("mouseup", onMouseUp);
-      }
-    };
-
-    bindAll();
-    rendition.on("rendered", bindAll);
+    rendition.on("touchstart", onTouchStart);
+    rendition.on("touchend", onTouchEnd);
+    rendition.on("mousedown", onMouseDown);
+    rendition.on("mouseup", onMouseUp);
     return () => {
-      rendition.off("rendered", bindAll);
-      // 换章/卸载时旧 iframe 会被 epub.js 整个移除，监听跟着一起消失，
-      // 不用逐个 removeEventListener。
+      rendition.off("touchstart", onTouchStart);
+      rendition.off("touchend", onTouchEnd);
+      rendition.off("mousedown", onMouseDown);
+      rendition.off("mouseup", onMouseUp);
     };
   }, [rendition]);
 
