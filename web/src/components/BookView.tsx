@@ -23,6 +23,8 @@ type Props = {
   initialCfi?: string | null;
   onSelect: (info: SelectionInfo) => void;
   onPositionChange?: (info: PositionInfo) => void;
+  /** 轻点正文（非划线、非翻页）时触发。用于沉浸式下切换顶部工具条显隐。 */
+  onTap?: () => void;
   settings: ReaderSettings;
 };
 
@@ -127,7 +129,7 @@ const NIGHT_READER_STYLES: IReactReaderStyle = {
  *   2. 不能开 allowScriptedContent —— EPUB 是不可信输入，开了 sandbox 就失效
  */
 export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
-  { url, initialCfi, onSelect, onPositionChange, settings },
+  { url, initialCfi, onSelect, onPositionChange, onTap, settings },
   ref,
 ) {
   const [location, setLocation] = useState<string | number>(initialCfi ?? 0);
@@ -137,6 +139,8 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
   // 用 ref 存回调，避免 rendition 的事件监听绑到过期的闭包上
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onTapRef = useRef(onTap);
+  onTapRef.current = onTap;
 
   // 暴露 goto：点击划线时把 location 设为该 CFI，react-reader 受控跳转。
   useImperativeHandle(
@@ -211,14 +215,22 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       const dx = x - startX;
       const dy = y - startY;
       const dt = Date.now() - startTime;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
       // 快速（< 800ms）且水平为主（水平位移 > 垂直的 1.2倍）且超过 40px →
       // 翻页。阈值比"理论上刚好够用"松一点，真手指划的动作不会像模拟事件
       // 那么干净。
-      if (dt < 800 && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      if (dt < 800 && absX > 40 && absX > absY * 1.2) {
         // 手指/鼠标向右移动（dx > 0）→ 上一页；向左移动 → 下一页。
         // 主流阅读 App（iBooks 等）对 LTR 内容都是这个方向。
         if (dx > 0) rendition.prev();
         else rendition.next();
+        return;
+      }
+      // 轻点：几乎没移动 + 时间短，既不是翻页也不是划词选中→ 切换工具条显隐
+      // （沉浸式阅读的标准手势：点一下藏/显顶部 chrome）。
+      if (dt < 400 && absX < 10 && absY < 10) {
+        onTapRef.current?.();
       }
     };
 
@@ -274,9 +286,33 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
   }, [rendition, settings.theme]);
 
   // 字号：override 按属性名覆盖，天然幂等。
+  //
+  // 但只改override CSS 不够：epub.js 的 themes.fontSize 只是往 iframe 注入
+  // 一条 `font-size`覆盖规则，并不会重新分页。分栏（column）宽度和总页数
+  // 会随字号变，可视口却还停在旧的翻页偏移上，于是常常显示成一整片空白
+  // （默认 110% 能正常显示，只是因为初次渲染时 react-reader 正好 display 过
+  // 一次，位置是对的）。所以改完字号要重新 display 当前位置，强制按新字号
+  // 重新分页——这正是 epub.js 自己在 onResized 里做的事
+  // （display(this.location.start.cfi)）。
+  //
+  // 放到下一帧执行：先让 override CSS 完成 reflow，再读当前 cfi 重新定位，
+  // 否则读到的是旧布局的位置。第一次运行（rendition 刚就绪、内容还没显示）
+  // 跳过，避免和react-reader 的初始 display 打架。
+  const fontFirstRunRef = useRef(true);
   useEffect(() => {
     if (!rendition) return;
     rendition.themes.fontSize(`${settings.fontSize}%`);
+    if (fontFirstRunRef.current) {
+      fontFirstRunRef.current = false;
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      const cfi = (
+        rendition.currentLocation() as unknown as { start?: { cfi?: string } }
+      )?.start?.cfi;
+      if (cfi) rendition.display(cfi);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [rendition, settings.fontSize]);
 
   // 单双页：spread() 内部会调 manager.updateLayout() 立即重排。

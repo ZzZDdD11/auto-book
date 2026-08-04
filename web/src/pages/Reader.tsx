@@ -99,12 +99,15 @@ function ReaderToolbar({
   onToggleTheme,
   onBumpFont,
   onCycleSpread,
+  hidden = false,
 }: {
   settings: ReaderSettings;
   ui: UiPalette;
   onToggleTheme: () => void;
   onBumpFont: (delta: number) => void;
   onCycleSpread: () => void;
+  /** 沉浸式下隐藏（淡出并禁用点击），但不卸载，方便平滑淡入淡出。 */
+  hidden?: boolean;
 }) {
   const divider: CSSProperties = {
     width: 1,
@@ -126,6 +129,10 @@ function ReaderToolbar({
         gap: 4,
         padding: "5px 8px",
         borderRadius: 999,
+        //沉浸式下淡出：透明 + 不吃点击，让位给正文；不卸载，方便再点一下淡回来。
+        opacity: hidden ? 0 : 1,
+        pointerEvents: hidden ? "none" : "auto",
+        transition: "opacity .2s ease",
         background: ui.toolbarBg,
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
@@ -881,6 +888,9 @@ export function Reader() {
   const ui = useUiPalette(settings);
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 沉浸式：手机上顶部工具条会盖住正文第一行，所以进来一小会儿后自动淡出，
+  // 轻点正文可随时再唤出/藏起。桌面上一直显示（有足够空间，不遮挡）。
+  const [chromeVisible, setChromeVisible] = useState(true);
 
   const bookRef = useRef<BookViewHandle>(null);
 
@@ -910,6 +920,15 @@ export function Reader() {
       }
     })();
   }, [id]);
+
+  // 顶部工具条自动淡出：只在手机上、且当前是显示状态时，3.5 秒后自动藏起，
+  // 避免一直盖着正文。桌面不自动隐藏（chromeVisible 只在手机上参与渲染判断）。
+  // chromeVisible 变 true（初次进入或轻点唤出）都会重置这个计时器。
+  useEffect(() => {
+    if (!isMobile || !chromeVisible) return;
+    const t = setTimeout(() => setChromeVisible(false), 3500);
+    return () => clearTimeout(t);
+  }, [isMobile, chromeVisible]);
 
   // 划线只入队，不弹窗 —— 允许接着划第二、第三条。
   // 进度仍立刻问后端要（前端算不了，它需要全书字数表），算好了原地更新那一条。
@@ -1068,6 +1087,7 @@ export function Reader() {
           onPositionChange={(info: PositionInfo) => {
             void savePosition(id, info).catch(() => {});
           }}
+          onTap={() => setChromeVisible((v) => !v)}
           settings={settings}
         />
         <ReaderToolbar
@@ -1076,6 +1096,7 @@ export function Reader() {
           onToggleTheme={toggleTheme}
           onBumpFont={bumpFont}
           onCycleSpread={cycleSpread}
+          hidden={isMobile && !chromeVisible}
         />
         <PendingQueue
           items={pending}
