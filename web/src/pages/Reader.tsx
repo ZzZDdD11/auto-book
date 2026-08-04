@@ -823,12 +823,12 @@ function ReadingProgress({
             background: ui.accent,
           }}
         />
-        {nodes.map((n) => (
-          // key不能只用 cfi：如果最近一条历史记忆点恰好等于当前位置
-          // （比如刚存过一次断点后还没翻页），两个节点 cfi 相同，React 会报
-          // 重复 key 警告。加上 current 区分"同一 cfi 的两种状态"。
+        {nodes.map((n, i) => (
+          // key 用数组下标：多条历史记忆点可能停在同一个 cfi（同位置两次坐下
+          // 来读），光靠 cfi 甚至 cfi+current 都可能撞。下标在这个列表里唯一，
+          // 且列表每次都整体重建（不做增量插入），不存在下标错位问题。
           <div
-            key={`${n.cfi}-${n.current}`}
+            key={i}
             onClick={() => onGoto(n.cfi)}
             title={`${n.label} · ${n.chapter ?? "未知章节"} · ${n.progress}%`}
             style={{
@@ -851,9 +851,9 @@ function ReadingProgress({
         {nodes
           .slice()
           .reverse()
-          .map((n) => (
+          .map((n, i) => (
             <div
-              key={`${n.cfi}-${n.current}`}
+              key={i}
               onClick={() => onGoto(n.cfi)}
               style={{
                 display: "flex",
