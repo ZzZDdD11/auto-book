@@ -817,8 +817,11 @@ function ReadingProgress({
           }}
         />
         {nodes.map((n) => (
+          // key不能只用 cfi：如果最近一条历史记忆点恰好等于当前位置
+          // （比如刚存过一次断点后还没翻页），两个节点 cfi 相同，React 会报
+          // 重复 key 警告。加上 current 区分"同一 cfi 的两种状态"。
           <div
-            key={n.cfi}
+            key={`${n.cfi}-${n.current}`}
             onClick={() => onGoto(n.cfi)}
             title={`${n.label} · ${n.chapter ?? "未知章节"} · ${n.progress}%`}
             style={{
@@ -843,7 +846,7 @@ function ReadingProgress({
           .reverse()
           .map((n) => (
             <div
-              key={n.cfi}
+              key={`${n.cfi}-${n.current}`}
               onClick={() => onGoto(n.cfi)}
               style={{
                 display: "flex",

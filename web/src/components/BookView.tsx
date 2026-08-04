@@ -81,14 +81,39 @@ function currentLocationInfo(rendition: Rendition): { chapterIndex: number; frac
   };
 }
 
+/**
+ * react-reader 默认的 `reader`（实际装EpubView/iframe 的那个盒子）内边距是
+ * top:50/left:50/right:50/bottom:20 的固定像素值——桌面排版遗留设定，在手机
+ * 390px 宽的屏幕上左右各切掉 50px，内容区只剩 290px，是"没有铺满全屏"的直接
+ * 原因（实测：390宽视口下 iframe 实际渲染宽度就是 290）。
+ *
+ * 这同时也是"划不动翻页"的真正原因：我们自己的滑动监听绑在 iframe 的
+ * window 上（见下面的 effect），只能感知发生在 iframe 内部的触摸；但可视内容
+ * 被这层内边距挤到中间一小块后，手指很容易从这块死白边（不在 iframe 内）起
+ * 触，那次滑动我们的监听器根本收不到。改成 0（配safe-area 兜底刘海屏），
+ * iframe 几乎铺满整个可视区域，两个问题一起解决。
+ * toc 按钮、上一页/下一页箭头都是绝对定位的浮层，不依赖这个内边距，
+ * 边到边之后依然正常显示（只是浮在内容上而不是浮在留白上）。
+ */
+const BASE_READER_STYLES: IReactReaderStyle = {
+  ...ReactReaderStyle,
+  reader: {
+    ...ReactReaderStyle.reader,
+    top: "env(safe-area-inset-top)",
+    left: "env(safe-area-inset-left)",
+    right: "env(safe-area-inset-right)",
+    bottom: "env(safe-area-inset-bottom)",
+  },
+};
+
 /** 夜间模式下 react-reader 外壳（标题、箭头、TOC）的样式覆盖。 */
 const NIGHT_READER_STYLES: IReactReaderStyle = {
-  ...ReactReaderStyle,
-  readerArea: { ...ReactReaderStyle.readerArea, backgroundColor: "#1a1a1f" },
-  titleArea: { ...ReactReaderStyle.titleArea, color: "#5a5a66" },
-  arrow: { ...ReactReaderStyle.arrow, color: "#3a3a44" },
-  arrowHover: { ...ReactReaderStyle.arrowHover, color: "#9a9aa6" },
-  tocButtonBar: { ...ReactReaderStyle.tocButtonBar, background: "#9a9aa6" },
+  ...BASE_READER_STYLES,
+  readerArea: { ...BASE_READER_STYLES.readerArea, backgroundColor: "#1a1a1f" },
+  titleArea: { ...BASE_READER_STYLES.titleArea, color: "#5a5a66" },
+  arrow: { ...BASE_READER_STYLES.arrow, color: "#3a3a44" },
+  arrowHover: { ...BASE_READER_STYLES.arrowHover, color: "#9a9aa6" },
+  tocButtonBar: { ...BASE_READER_STYLES.tocButtonBar, background: "#9a9aa6" },
 };
 
 /**
@@ -267,7 +292,7 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
   }, [rendition, settings.spread]);
 
   const readerStyles =
-    settings.theme === "night" ? NIGHT_READER_STYLES : ReactReaderStyle;
+    settings.theme === "night" ? NIGHT_READER_STYLES : BASE_READER_STYLES;
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
