@@ -116,8 +116,10 @@ function ReaderToolbar({
     <div
       style={{
         position: "absolute",
-        top: 14,
-        right: 16,
+        // env(safe-area-inset-*) 在没有刘海/无遮挡的设备上是 0，
+        // 加了对普通设备没有影响，只在刘海屏上把工具条挪出遮挡区。
+        top: "calc(14px + env(safe-area-inset-top))",
+        right: "calc(16px + env(safe-area-inset-right))",
         zIndex: 30,
         display: "flex",
         alignItems: "center",
@@ -206,8 +208,8 @@ function PendingQueue({
     <div
       style={{
         position: "absolute",
-        top: 60,
-        right: 16,
+        top: "calc(60px + env(safe-area-inset-top))",
+        right: "calc(16px + env(safe-area-inset-right))",
         zIndex: 25,
         display: "flex",
         flexDirection: "column",
@@ -1038,7 +1040,21 @@ export function Reader() {
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: ui.panel }}>
+    <div
+      style={{
+        display: "flex",
+        // 100vh 在手机浏览器上是"含地址栏"的固定值，地址栏收起/展开时页面
+        // 会露出一截空白或裁掉内容；100dvh 跟着可视区域动态变化，才是真正
+        // 铺满全屏。这是内联样式对象（不是 CSS 文本），同名key 不能靠"后面
+        // 覆盖前面"做优雅降级，所以用 calc(min()) 兜底：不认识 dvh 单位的
+        // 老浏览器会让min() 整个失效，落回 100vh；认识的就取较小值
+        // （两者理论上相等，min只是为了兼容写法，不是真的要取小）。
+        height: "calc(100vh)",
+        maxHeight: "100dvh",
+        overflow: "hidden",
+        background: ui.panel,
+      }}
+    >
       {/* 阅读区：手机上全屏，桌面上占左边剩余空间 */}
       <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
         <BookView
@@ -1068,28 +1084,39 @@ export function Reader() {
         />
 
         {isMobile ? (
+          // 之前这个按钮只显示"划线 N"，完全没提示点进去还有阅读进度/历史
+          // 记忆点——用户根本不知道要点这里找历史记录。现在把进度百分比
+          // 放在按钮正面（最想让人一眼看到的信息），划线数退到小字，
+          // 点开还是原来那个抽屉（阅读进度 + 划线列表都在里面）。
           <button
             onClick={() => setDrawerOpen(true)}
             style={{
               position: "absolute",
-              bottom: 20,
-              right: 16,
+              bottom: "calc(20px + env(safe-area-inset-bottom))",
+              right: "calc(16px + env(safe-area-inset-right))",
               zIndex: 30,
-              width: 50,
-              height: 50,
+              width: 54,
+              height: 54,
               borderRadius: "50%",
               border: "none",
               background: ui.accent,
               color: ui.accentText,
-              fontSize: 11,
-              lineHeight: 1.3,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1.15,
               cursor: "pointer",
               boxShadow: "0 4px 14px rgba(0,0,0,.25)",
             }}
+            title="阅读进度与划线"
           >
-            划线
-            <br />
-            {materials.length}
+            <span style={{ fontSize: 15, fontWeight: 700 }}>
+              {book?.last_progress ?? 0}%
+            </span>
+            <span style={{ fontSize: 9.5, opacity: 0.85 }}>
+              划线{materials.length}
+            </span>
           </button>
         ) : null}
       </div>
@@ -1113,7 +1140,8 @@ export function Reader() {
               zIndex: 41,
               transform: drawerOpen ? "translateX(0)" : "translateX(100%)",
               transition: "transform .25s ease",
-              padding: "18px 18px 40px",
+              padding:
+                "calc(18px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) 18px",
               overflowY: "auto",
               background: ui.panel,
               color: ui.text,
@@ -1124,8 +1152,8 @@ export function Reader() {
               onClick={() => setDrawerOpen(false)}
               style={{
                 position: "absolute",
-                top: 14,
-                right: 14,
+                top: "calc(14px + env(safe-area-inset-top))",
+                right: "calc(14px + env(safe-area-inset-right))",
                 border: "none",
                 background: "transparent",
                 color: ui.sub,

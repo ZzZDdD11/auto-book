@@ -154,19 +154,17 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
   // effect 在 rendition 就绪后同步执行，早于首章内容加载，所以 select 不会闪屏。
 
   // 拖动翻页：快速水平滑动翻页，慢速拖动选中文字。
-  // 不用 epub.js 的 swipeable —— 它在 touchmove 时 preventDefault，
+  // 不用 epub.js 的 swipeable —— 它在 touchmove 时preventDefault，
   // 把选区行为一起杀了。这里只在 touchend 判断：快速且水平为主的滑动才翻页，
   // 慢速长按的交给浏览器正常选中。
   // 桌面端也支持：鼠标快速横向拖动翻页，慢速拖动选中。
+  //
+  // 之前的实现只在 rendition 刚创建时绑一次：那一刻内容通常还没渲染进 iframe
+  // （getContents() 是空数组），绑定直接短路退出，翻页手势从没生效过；换章后
+  // epub.js 还会换一批新 iframe，旧监听也够不到新的。改成监听 "rendered" 事件，
+  // 每次有新内容渲染（首次加载 / 翻章）都补绑，用 WeakSet 记重复绑定。
   useEffect(() => {
     if (!rendition) return;
-
-    const contents = rendition.getContents() as unknown as {
-      window?: Window;
-      document?: Document;
-    }[];
-    const iframeWin = contents[0]?.window;
-    if (!iframeWin) return;
 
     let startX = 0;
     let startY = 0;
@@ -208,16 +206,26 @@ export const BookView = forwardRef<BookViewHandle, Props>(function BookView(
       mouseDown = false;
     };
 
-    iframeWin.addEventListener("touchstart", onTouchStart, { passive: true });
-    iframeWin.addEventListener("touchend", onTouchEnd, { passive: true });
-    iframeWin.addEventListener("mousedown", onMouseDown);
-    iframeWin.addEventListener("mouseup", onMouseUp);
+    const bound = new WeakSet<Window>();
+    const bindAll = () => {
+      const contents = rendition.getContents() as unknown as { window?: Window }[];
+      for (const c of contents) {
+        const win = c.window;
+        if (!win || bound.has(win)) continue;
+        bound.add(win);
+        win.addEventListener("touchstart", onTouchStart, { passive: true });
+        win.addEventListener("touchend", onTouchEnd, { passive: true });
+        win.addEventListener("mousedown", onMouseDown);
+        win.addEventListener("mouseup", onMouseUp);
+      }
+    };
 
+    bindAll();
+    rendition.on("rendered", bindAll);
     return () => {
-      iframeWin.removeEventListener("touchstart", onTouchStart);
-      iframeWin.removeEventListener("touchend", onTouchEnd);
-      iframeWin.removeEventListener("mousedown", onMouseDown);
-      iframeWin.removeEventListener("mouseup", onMouseUp);
+      rendition.off("rendered", bindAll);
+      // 换章/卸载时旧 iframe 会被 epub.js 整个移除，监听跟着一起消失，
+      // 不用逐个 removeEventListener。
     };
   }, [rendition]);
 
