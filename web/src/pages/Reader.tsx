@@ -888,8 +888,8 @@ export function Reader() {
   const ui = useUiPalette(settings);
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // 沉浸式：手机上顶部工具条会盖住正文第一行，所以进来一小会儿后自动淡出，
-  // 轻点正文可随时再唤出/藏起。桌面上一直显示（有足够空间，不遮挡）。
+  // 沉浸式：顶部工具条会盖住正文，所以进来一小会儿后自动淡出，
+  // 轻点正文可随时再唤出/藏起。桌面和手机一致。
   const [chromeVisible, setChromeVisible] = useState(true);
 
   const bookRef = useRef<BookViewHandle>(null);
@@ -921,14 +921,14 @@ export function Reader() {
     })();
   }, [id]);
 
-  // 顶部工具条自动淡出：只在手机上、且当前是显示状态时，3.5 秒后自动藏起，
-  // 避免一直盖着正文。桌面不自动隐藏（chromeVisible 只在手机上参与渲染判断）。
+  // 顶部工具条自动淡出：3.5 秒后自动藏起，避免一直盖住正文。
+  // 桌面和手机一致——轻点正文可随时再唤出/藏起。
   // chromeVisible 变 true（初次进入或轻点唤出）都会重置这个计时器。
   useEffect(() => {
-    if (!isMobile || !chromeVisible) return;
+    if (!chromeVisible) return;
     const t = setTimeout(() => setChromeVisible(false), 3500);
     return () => clearTimeout(t);
-  }, [isMobile, chromeVisible]);
+  }, [chromeVisible]);
 
   // 划线只入队，不弹窗 —— 允许接着划第二、第三条。
   // 进度仍立刻问后端要（前端算不了，它需要全书字数表），算好了原地更新那一条。
@@ -1096,7 +1096,7 @@ export function Reader() {
           onToggleTheme={toggleTheme}
           onBumpFont={bumpFont}
           onCycleSpread={cycleSpread}
-          hidden={isMobile && !chromeVisible}
+          hidden={!chromeVisible}
         />
         <PendingQueue
           items={pending}
